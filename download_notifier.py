@@ -35,24 +35,43 @@ WINDOW_MIN_WIDTH = 800
 WINDOW_MIN_HEIGHT = 600
 SETTINGS_FILE = "settings.json"
 
-# --- Theme Configuration ---
+# --- Enhanced Theme Configuration ---
+DARK_THEME = {
+    "bg": "#2b2b2b",
+    "fg": "#ffffff",
+    "secondary_bg": "#3c3c3c",
+    "accent": "#4CAF50",
+    "accent_hover": "#45a049",
+    "danger": "#f44336",
+    "danger_hover": "#da190b",
+    "warning": "#ff9800",
+    "info": "#2196F3",
+    "success": "#4CAF50",
+    "text_bg": "#404040",
+    "text_fg": "#ffffff",
+    "entry_bg": "#505050",
+    "entry_fg": "#ffffff",
+    "border": "#555555",
+    "hover": "#4a4a4a"
+}
+
 LIGHT_THEME = {
-    "bg": "#f0f0f0",  # Light grey background
-    "fg": "#333333",  # Dark grey foreground
-    "button_bg": "#4CAF50", # Green for start
-    "button_fg": "white",
-    "stop_button_bg": "#f44336", # Red for stop
-    "stop_button_fg": "white",
-    "text_bg": "white",
+    "bg": "#f5f5f5",
+    "fg": "#333333",
+    "secondary_bg": "#ffffff",
+    "accent": "#4CAF50",
+    "accent_hover": "#45a049",
+    "danger": "#f44336",
+    "danger_hover": "#da190b",
+    "warning": "#ff9800",
+    "info": "#2196F3",
+    "success": "#4CAF50",
+    "text_bg": "#ffffff",
     "text_fg": "#333333",
-    "entry_bg": "white",
+    "entry_bg": "#ffffff",
     "entry_fg": "#333333",
-    "browse_button_bg": "#2196F3", # Blue for browse
-    "browse_button_fg": "white",
-    "stop_alarm_button_bg": "#FFC107", # Amber for stop alarm
-    "stop_alarm_button_fg": "black",
-    "about_link_fg": "#0000EE", # Standard blue for links
-    "footer_fg": "#666666" # Darker grey for footer in light theme
+    "border": "#cccccc",
+    "hover": "#e0e0e0"
 }
 
 # --- Enhanced File System Event Handler with Size Checking ---
@@ -513,247 +532,695 @@ class SizeAwareDownloadHandler(FileSystemEventHandler):
 class DownloadNotifierApp:
     def __init__(self, master):
         self.master = master
-        master.title("Download Notifier - Enhanced v1.1")
-        master.geometry("700x500")
-        master.resizable(True, True)  # Make window resizable
-        master.minsize(600, 450)  # Set minimum size
+        master.title(f"Download Notifier Pro v{APP_VERSION}")
+        master.geometry("900x700")
+        master.resizable(True, True)
+        master.minsize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
 
+        # Application state
         self.monitor_path = tk.StringVar(value=DEFAULT_DOWNLOAD_DIR)
-        self.observers = [] # List to hold multiple Observer instances
+        self.observers = []
         self.event_handler = None
         self.is_monitoring = False
-        self.notification_sound_enabled = tk.BooleanVar(value=True)
-        self.notification_popup_enabled = tk.BooleanVar(value=True)
-        self.min_file_size = tk.DoubleVar(value=MIN_FILE_SIZE_MB)
+        self.download_history = []
+        self.statistics = {
+            "total_downloads": 0,
+            "total_size": 0,
+            "session_start": time.time()
+        }
         
-        # Initialize Pygame mixer here as well, in case it wasn't done in __main__
+        # Settings
+        self.current_theme = "light"
+        self.settings = self.load_settings()
+        self.notification_sound_enabled = tk.BooleanVar(value=self.settings.get("sound_enabled", True))
+        self.notification_popup_enabled = tk.BooleanVar(value=self.settings.get("popup_enabled", True))
+        self.min_file_size = tk.DoubleVar(value=self.settings.get("min_file_size", MIN_FILE_SIZE_MB))
+        self.auto_clear_log = tk.BooleanVar(value=self.settings.get("auto_clear_log", False))
+        self.show_file_details = tk.BooleanVar(value=self.settings.get("show_file_details", True))
+        
+        # Initialize Pygame mixer
         if not pygame.mixer.get_init():
             try:
                 pygame.mixer.init()
             except Exception as e:
                 print(f"Could not initialize Pygame mixer in app: {e}")
 
+        # Setup UI
+        self.setup_styles()
         self._create_widgets()
-        self._apply_theme(LIGHT_THEME) # Always apply light theme
-        self._center_window() # Center the window after widgets are created and theme applied
-
-        # --- MODIFICATION: CHANGE THE WINDOW CLOSE PROTOCOL ---
-        # Now, clicking 'X' will call on_closing, which stops monitoring and quits the app.
+        self.apply_theme()
+        self._center_window()
+        
+        # Bind events
         self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.master.bind("<Control-s>", lambda e: self.save_settings())
+        self.master.bind("<F5>", lambda e: self.refresh_ui())
+        
+        # Status bar timer
+        self.status_timer = None
 
+    def load_settings(self):
+        """Load settings from JSON file"""
+        try:
+            if os.path.exists(SETTINGS_FILE):
+                with open(SETTINGS_FILE, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"Error loading settings: {e}")
+        return {}
+    
+    def save_settings(self):
+        """Save current settings to JSON file"""
+        try:
+            settings = {
+                "sound_enabled": self.notification_sound_enabled.get(),
+                "popup_enabled": self.notification_popup_enabled.get(),
+                "min_file_size": self.min_file_size.get(),
+                "auto_clear_log": self.auto_clear_log.get(),
+                "show_file_details": self.show_file_details.get(),
+                "monitor_paths": self.monitor_path.get(),
+                "theme": self.current_theme,
+                "window_geometry": self.master.geometry()
+            }
+            with open(SETTINGS_FILE, 'w') as f:
+                json.dump(settings, f, indent=2)
+            self.show_status("Settings saved successfully", "success", 2000)
+        except Exception as e:
+            self.show_status(f"Error saving settings: {e}", "error", 3000)
+    
+    def setup_styles(self):
+        """Setup ttk styles"""
+        self.style = ttk.Style()
+        self.style.theme_use('clam')
+        
+        # Configure styles for different themes
+        self.configure_styles()
+    
+    def configure_styles(self):
+        """Configure ttk styles based on current theme"""
+        theme = DARK_THEME if self.current_theme == "dark" else LIGHT_THEME
+        
+        # Configure ttk styles
+        self.style.configure('Title.TLabel', 
+                           font=('Segoe UI', 16, 'bold'),
+                           background=theme["bg"],
+                           foreground=theme["fg"])
+        
+        self.style.configure('Heading.TLabel',
+                           font=('Segoe UI', 12, 'bold'),
+                           background=theme["bg"],
+                           foreground=theme["fg"])
+        
+        self.style.configure('Custom.TButton',
+                           font=('Segoe UI', 10),
+                           padding=(10, 5))
+        
+        self.style.configure('Accent.TButton',
+                           font=('Segoe UI', 11, 'bold'),
+                           padding=(15, 8))
+        
+        # Notebook styles
+        self.style.configure('Custom.TNotebook',
+                           background=theme["bg"],
+                           borderwidth=0)
+        
+        self.style.configure('Custom.TNotebook.Tab',
+                           padding=(20, 10),
+                           font=('Segoe UI', 10))
+
+    def refresh_ui(self):
+        """Refresh the UI components"""
+        self.apply_theme()
+        self.update_statistics_display()
+        self.show_status("UI refreshed", "info", 1500)
+
+    def _create_widgets(self):
+        """Create the modern UI layout"""
+        # Create main container
+        self.main_container = tk.Frame(self.master)
+        self.main_container.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Create header
+        self.create_header()
+        
+        # Create main content area with notebook
+        self.create_main_content()
+        
+        # Create status bar
+        self.create_status_bar()
+    
+    def create_header(self):
+        """Create the application header"""
+        header_frame = tk.Frame(self.main_container, height=80)
+        header_frame.pack(fill="x", pady=(0, 15))
+        header_frame.pack_propagate(False)
+        
+        # Left side - App title and version
+        title_frame = tk.Frame(header_frame)
+        title_frame.pack(side="left", fill="y")
+        
+        self.app_title = tk.Label(title_frame, text="Download Notifier Pro", 
+                                 font=("Segoe UI", 20, "bold"))
+        self.app_title.pack(anchor="w")
+        
+        self.version_label = tk.Label(title_frame, text=f"Version {APP_VERSION}",
+                                     font=("Segoe UI", 9))
+        self.version_label.pack(anchor="w")
+        
+        # Right side - Theme toggle and monitoring status
+        controls_frame = tk.Frame(header_frame)
+        controls_frame.pack(side="right", fill="y")
+        
+        # Theme toggle button
+        self.theme_button = tk.Button(controls_frame, text="🌙 Dark",
+                                     command=self.toggle_theme,
+                                     font=("Segoe UI", 9),
+                                     relief="flat", bd=1, padx=15, pady=5)
+        self.theme_button.pack(side="top", anchor="e", pady=(0, 5))
+        
+        # Monitoring status indicator
+        self.status_indicator = tk.Label(controls_frame, text="● Stopped",
+                                        font=("Segoe UI", 10, "bold"))
+        self.status_indicator.pack(side="top", anchor="e")
+    
+    def create_main_content(self):
+        """Create the main content area with tabs"""
+        # Create notebook for tabs
+        self.notebook = ttk.Notebook(self.main_container, style='Custom.TNotebook')
+        self.notebook.pack(fill="both", expand=True)
+        
+        # Tab 1: Monitor Settings
+        self.create_monitor_tab()
+        
+        # Tab 2: Activity Log
+        self.create_activity_tab()
+        
+        # Tab 3: Statistics
+        self.create_statistics_tab()
+        
+        # Tab 4: Settings
+        self.create_settings_tab()
+    
+    def create_monitor_tab(self):
+        """Create the main monitoring tab"""
+        monitor_frame = tk.Frame(self.notebook)
+        self.notebook.add(monitor_frame, text="📁 Monitor")
+        
+        # Directory selection section
+        dir_section = tk.LabelFrame(monitor_frame, text="📂 Directories to Monitor",
+                                   font=("Segoe UI", 11, "bold"), padx=15, pady=10)
+        dir_section.pack(fill="x", padx=10, pady=10)
+        
+        # Path entry with modern styling
+        path_frame = tk.Frame(dir_section)
+        path_frame.pack(fill="x", pady=5)
+        
+        tk.Label(path_frame, text="Paths (comma-separated):",
+                font=("Segoe UI", 10)).pack(anchor="w", pady=(0, 5))
+        
+        entry_frame = tk.Frame(path_frame)
+        entry_frame.pack(fill="x")
+        
+        self.path_entry = tk.Entry(entry_frame, textvariable=self.monitor_path,
+                                  font=("Segoe UI", 10), relief="solid", bd=1)
+        self.path_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        
+        self.browse_button = tk.Button(entry_frame, text="📁 Browse",
+                                      command=self.browse_directory,
+                                      font=("Segoe UI", 10), relief="raised", bd=1,
+                                      padx=15, pady=8)
+        self.browse_button.pack(side="right")
+        
+        # Quick path buttons
+        quick_paths_frame = tk.Frame(dir_section)
+        quick_paths_frame.pack(fill="x", pady=(10, 0))
+        
+        tk.Label(quick_paths_frame, text="Quick Add:",
+                font=("Segoe UI", 9)).pack(side="left", padx=(0, 10))
+        
+        quick_paths = [
+            ("Downloads", os.path.join(os.path.expanduser("~"), "Downloads")),
+            ("Desktop", os.path.join(os.path.expanduser("~"), "Desktop")),
+            ("Documents", os.path.join(os.path.expanduser("~"), "Documents"))
+        ]
+        
+        for name, path in quick_paths:
+            btn = tk.Button(quick_paths_frame, text=name,
+                           command=lambda p=path: self.add_quick_path(p),
+                           font=("Segoe UI", 8), relief="flat", bd=1,
+                           padx=8, pady=2)
+            btn.pack(side="left", padx=(0, 5))
+        
+        # Control buttons section
+        control_section = tk.LabelFrame(monitor_frame, text="🎮 Control Panel",
+                                       font=("Segoe UI", 11, "bold"), padx=15, pady=10)
+        control_section.pack(fill="x", padx=10, pady=10)
+        
+        buttons_frame = tk.Frame(control_section)
+        buttons_frame.pack(fill="x", pady=10)
+        
+        # Start/Stop buttons with modern styling
+        self.start_button = tk.Button(buttons_frame, text="▶️ Start Monitoring",
+                                     command=self.start_monitoring,
+                                     font=("Segoe UI", 12, "bold"),
+                                     relief="raised", bd=2, padx=20, pady=12)
+        self.start_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
+        
+        self.stop_button = tk.Button(buttons_frame, text="⏹️ Stop Monitoring",
+                                    command=self.stop_monitoring,
+                                    font=("Segoe UI", 12, "bold"),
+                                    relief="raised", bd=2, padx=20, pady=12,
+                                    state="disabled")
+        self.stop_button.pack(side="left", expand=True, fill="x", padx=(5, 0))
+        
+        # Additional controls
+        extra_controls = tk.Frame(control_section)
+        extra_controls.pack(fill="x", pady=(10, 0))
+        
+        self.stop_alarm_button = tk.Button(extra_controls, text="🔇 Stop Alarm",
+                                          command=self.stop_alarm,
+                                          font=("Segoe UI", 10),
+                                          relief="raised", bd=1, padx=15, pady=6,
+                                          state="disabled")
+        self.stop_alarm_button.pack(side="left", padx=(0, 10))
+        
+        self.test_sound_button = tk.Button(extra_controls, text="🔊 Test Sound",
+                                          command=self.test_alarm_sound,
+                                          font=("Segoe UI", 10),
+                                          relief="raised", bd=1, padx=15, pady=6)
+        self.test_sound_button.pack(side="left", padx=(0, 10))
+        
+        # Status display
+        status_section = tk.LabelFrame(monitor_frame, text="📊 Current Status",
+                                      font=("Segoe UI", 11, "bold"), padx=15, pady=10)
+        status_section.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        self.status_text = tk.Text(status_section, height=6, wrap="word",
+                                  font=("Consolas", 9), relief="solid", bd=1,
+                                  state="disabled")
+        self.status_text.pack(fill="both", expand=True, pady=5)
+        
+    def create_activity_tab(self):
+        """Create the activity log tab"""
+        activity_frame = tk.Frame(self.notebook)
+        self.notebook.add(activity_frame, text="📜 Activity")
+        
+        # Log controls
+        log_controls = tk.Frame(activity_frame)
+        log_controls.pack(fill="x", padx=10, pady=10)
+        
+        # Filter controls
+        filter_frame = tk.LabelFrame(log_controls, text="🔍 Filters", 
+                                    font=("Segoe UI", 10, "bold"), padx=10, pady=5)
+        filter_frame.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        
+        self.log_filter = tk.StringVar(value="all")
+        filters = [("All", "all"), ("Downloads", "download"), ("Errors", "error"), ("Info", "info")]
+        
+        for text, value in filters:
+            rb = tk.Radiobutton(filter_frame, text=text, variable=self.log_filter,
+                               value=value, command=self.filter_log,
+                               font=("Segoe UI", 9))
+            rb.pack(side="left", padx=5)
+        
+        # Log action buttons
+        actions_frame = tk.Frame(log_controls)
+        actions_frame.pack(side="right")
+        
+        self.clear_log_button = tk.Button(actions_frame, text="🗑️ Clear",
+                                         command=self.clear_log,
+                                         font=("Segoe UI", 9), relief="raised", bd=1,
+                                         padx=10, pady=5)
+        self.clear_log_button.pack(side="left", padx=(0, 5))
+        
+        self.save_log_button = tk.Button(actions_frame, text="💾 Save",
+                                        command=self.save_log,
+                                        font=("Segoe UI", 9), relief="raised", bd=1,
+                                        padx=10, pady=5)
+        self.save_log_button.pack(side="left", padx=(0, 5))
+        
+        self.export_button = tk.Button(actions_frame, text="📤 Export",
+                                      command=self.export_log,
+                                      font=("Segoe UI", 9), relief="raised", bd=1,
+                                      padx=10, pady=5)
+        self.export_button.pack(side="left")
+        
+        # Log display
+        log_display_frame = tk.Frame(activity_frame)
+        log_display_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        
+        # Create text widget with scrollbars
+        self.log_text = tk.Text(log_display_frame, wrap="word", font=("Consolas", 9),
+                               relief="solid", bd=1, state="disabled")
+        self.log_text.pack(side="left", fill="both", expand=True)
+        
+        # Configure text tags for different log levels
+        self.log_text.tag_config("download", foreground="#4CAF50", font=("Consolas", 9, "bold"))
+        self.log_text.tag_config("error", foreground="#f44336", font=("Consolas", 9, "bold"))
+        self.log_text.tag_config("warning", foreground="#ff9800", font=("Consolas", 9, "bold"))
+        self.log_text.tag_config("info", foreground="#2196F3")
+        self.log_text.tag_config("timestamp", foreground="#666666", font=("Consolas", 8))
+        
+        # Scrollbars
+        v_scrollbar = tk.Scrollbar(log_display_frame, orient="vertical", command=self.log_text.yview)
+        v_scrollbar.pack(side="right", fill="y")
+        self.log_text.config(yscrollcommand=v_scrollbar.set)
+        
+        h_scrollbar = tk.Scrollbar(activity_frame, orient="horizontal", command=self.log_text.xview)
+        h_scrollbar.pack(side="bottom", fill="x", padx=10)
+        self.log_text.config(xscrollcommand=h_scrollbar.set)
+    
+    def create_statistics_tab(self):
+        """Create the statistics tab"""
+        stats_frame = tk.Frame(self.notebook)
+        self.notebook.add(stats_frame, text="📊 Statistics")
+        
+        # Statistics display
+        stats_container = tk.Frame(stats_frame)
+        stats_container.pack(fill="both", expand=True, padx=15, pady=15)
+        
+        # Session statistics
+        session_frame = tk.LabelFrame(stats_container, text="📈 Session Statistics",
+                                     font=("Segoe UI", 12, "bold"), padx=15, pady=10)
+        session_frame.pack(fill="x", pady=(0, 15))
+        
+        self.create_stat_row(session_frame, "Session Duration:", "session_duration")
+        self.create_stat_row(session_frame, "Downloads Detected:", "total_downloads")
+        self.create_stat_row(session_frame, "Total Data Size:", "total_size")
+        self.create_stat_row(session_frame, "Average File Size:", "avg_size")
+        
+        # Recent downloads
+        recent_frame = tk.LabelFrame(stats_container, text="📥 Recent Downloads",
+                                    font=("Segoe UI", 12, "bold"), padx=15, pady=10)
+        recent_frame.pack(fill="both", expand=True)
+        
+        # Create treeview for recent downloads
+        columns = ("Time", "Filename", "Size", "Location")
+        self.recent_tree = ttk.Treeview(recent_frame, columns=columns, show="headings", height=10)
+        
+        # Configure columns
+        self.recent_tree.heading("Time", text="Time")
+        self.recent_tree.heading("Filename", text="Filename")
+        self.recent_tree.heading("Size", text="Size")
+        self.recent_tree.heading("Location", text="Location")
+        
+        self.recent_tree.column("Time", width=120, minwidth=100)
+        self.recent_tree.column("Filename", width=250, minwidth=200)
+        self.recent_tree.column("Size", width=100, minwidth=80)
+        self.recent_tree.column("Location", width=300, minwidth=200)
+        
+        self.recent_tree.pack(fill="both", expand=True, pady=5)
+        
+        # Treeview scrollbar
+        tree_scroll = tk.Scrollbar(recent_frame, orient="vertical", command=self.recent_tree.yview)
+        tree_scroll.pack(side="right", fill="y")
+        self.recent_tree.config(yscrollcommand=tree_scroll.set)
+        
+        # Statistics action buttons
+        stats_actions = tk.Frame(stats_container)
+        stats_actions.pack(fill="x", pady=(10, 0))
+        
+        tk.Button(stats_actions, text="🔄 Refresh", command=self.update_statistics_display,
+                 font=("Segoe UI", 10), relief="raised", bd=1, padx=15, pady=5).pack(side="left")
+        
+        tk.Button(stats_actions, text="📊 Export Stats", command=self.export_statistics,
+                 font=("Segoe UI", 10), relief="raised", bd=1, padx=15, pady=5).pack(side="left", padx=(10, 0))
+        
+        tk.Button(stats_actions, text="🗑️ Clear History", command=self.clear_statistics,
+                 font=("Segoe UI", 10), relief="raised", bd=1, padx=15, pady=5).pack(side="left", padx=(10, 0))
+    
+    def create_settings_tab(self):
+        """Create the settings tab"""
+        settings_frame = tk.Frame(self.notebook)
+        self.notebook.add(settings_frame, text="⚙️ Settings")
+        
+        # Create scrollable frame
+        canvas = tk.Canvas(settings_frame)
+        scrollbar = tk.Scrollbar(settings_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Notification settings
+        notif_frame = tk.LabelFrame(scrollable_frame, text="🔔 Notifications",
+                                   font=("Segoe UI", 12, "bold"), padx=15, pady=10)
+        notif_frame.pack(fill="x", padx=15, pady=(15, 10))
+        
+        self.sound_checkbox = tk.Checkbutton(notif_frame, text="🔊 Enable sound notifications",
+                                            variable=self.notification_sound_enabled,
+                                            font=("Segoe UI", 10))
+        self.sound_checkbox.pack(anchor="w", pady=2)
+        
+        self.popup_checkbox = tk.Checkbutton(notif_frame, text="💬 Enable popup notifications",
+                                            variable=self.notification_popup_enabled,
+                                            font=("Segoe UI", 10))
+        self.popup_checkbox.pack(anchor="w", pady=2)
+        
+        # File filtering settings
+        filter_frame = tk.LabelFrame(scrollable_frame, text="🎯 File Filtering",
+                                    font=("Segoe UI", 12, "bold"), padx=15, pady=10)
+        filter_frame.pack(fill="x", padx=15, pady=10)
+        
+        size_frame = tk.Frame(filter_frame)
+        size_frame.pack(fill="x", pady=5)
+        
+        tk.Label(size_frame, text="Minimum file size (MB):",
+                font=("Segoe UI", 10)).pack(side="left")
+        
+        self.size_spinbox = tk.Spinbox(size_frame, from_=0.1, to=1000.0, increment=0.5,
+                                      textvariable=self.min_file_size, width=10,
+                                      font=("Segoe UI", 10))
+        self.size_spinbox.pack(side="left", padx=(10, 0))
+        
+        # Advanced settings
+        advanced_frame = tk.LabelFrame(scrollable_frame, text="🔧 Advanced",
+                                      font=("Segoe UI", 12, "bold"), padx=15, pady=10)
+        advanced_frame.pack(fill="x", padx=15, pady=10)
+        
+        self.auto_clear_checkbox = tk.Checkbutton(advanced_frame, text="🧹 Auto-clear log (1000+ entries)",
+                                                 variable=self.auto_clear_log,
+                                                 font=("Segoe UI", 10))
+        self.auto_clear_checkbox.pack(anchor="w", pady=2)
+        
+        self.details_checkbox = tk.Checkbutton(advanced_frame, text="📝 Show detailed file information",
+                                              variable=self.show_file_details,
+                                              font=("Segoe UI", 10))
+        self.details_checkbox.pack(anchor="w", pady=2)
+        
+        # Application settings
+        app_frame = tk.LabelFrame(scrollable_frame, text="🎨 Application",
+                                 font=("Segoe UI", 12, "bold"), padx=15, pady=10)
+        app_frame.pack(fill="x", padx=15, pady=10)
+        
+        # Theme selection
+        theme_selection = tk.Frame(app_frame)
+        theme_selection.pack(fill="x", pady=5)
+        
+        tk.Label(theme_selection, text="Theme:", font=("Segoe UI", 10)).pack(side="left")
+        
+        self.theme_var = tk.StringVar(value=self.current_theme)
+        for theme in ["light", "dark"]:
+            rb = tk.Radiobutton(theme_selection, text=theme.title(), variable=self.theme_var,
+                               value=theme, command=self.apply_theme,
+                               font=("Segoe UI", 10))
+            rb.pack(side="left", padx=(10, 0))
+        
+        # Action buttons
+        actions_frame = tk.Frame(scrollable_frame)
+        actions_frame.pack(fill="x", padx=15, pady=15)
+        
+        tk.Button(actions_frame, text="💾 Save Settings", command=self.save_settings,
+                 font=("Segoe UI", 11, "bold"), relief="raised", bd=2,
+                 padx=20, pady=8).pack(side="left")
+        
+        tk.Button(actions_frame, text="🔄 Reset to Defaults", command=self.reset_settings,
+                 font=("Segoe UI", 10), relief="raised", bd=1,
+                 padx=15, pady=8).pack(side="left", padx=(10, 0))
+        
+        tk.Button(actions_frame, text="ℹ️ About", command=self.show_about,
+                 font=("Segoe UI", 10), relief="raised", bd=1,
+                 padx=15, pady=8).pack(side="right")
+        
+    def create_status_bar(self):
+        """Create the status bar"""
+        self.status_bar = tk.Frame(self.main_container, height=30, relief="sunken", bd=1)
+        self.status_bar.pack(fill="x", side="bottom", pady=(10, 0))
+        self.status_bar.pack_propagate(False)
+        
+        # Status text
+        self.status_label = tk.Label(self.status_bar, text="Ready to monitor downloads...",
+                                    font=("Segoe UI", 9), anchor="w")
+        self.status_label.pack(side="left", fill="x", expand=True, padx=10)
+        
+        # Progress indicator (hidden by default)
+        self.progress_var = tk.DoubleVar()
+        self.progress_bar = ttk.Progressbar(self.status_bar, variable=self.progress_var,
+                                          mode="determinate", length=150)
+        # Don't pack initially
+        
+        # Connection status
+        self.connection_label = tk.Label(self.status_bar, text="●", 
+                                        font=("Segoe UI", 12), fg="red")
+        self.connection_label.pack(side="right", padx=(0, 10))
+    
+    def create_stat_row(self, parent, label, key):
+        """Create a statistics display row"""
+        frame = tk.Frame(parent)
+        frame.pack(fill="x", pady=2)
+        
+        tk.Label(frame, text=label, font=("Segoe UI", 10)).pack(side="left")
+        
+        value_label = tk.Label(frame, text="--", font=("Segoe UI", 10, "bold"))
+        value_label.pack(side="right")
+        
+        # Store reference for updating
+        setattr(self, f"stat_{key}", value_label)
+    
     def _center_window(self):
-        """Centers the Tkinter window on the screen."""
-        self.master.update_idletasks() # Update window to get accurate dimensions
+        """Center the window on screen"""
+        self.master.update_idletasks()
         width = self.master.winfo_width()
         height = self.master.winfo_height()
         x = (self.master.winfo_screenwidth() // 2) - (width // 2)
         y = (self.master.winfo_screenheight() // 2) - (height // 2)
         self.master.geometry(f'{width}x{height}+{x}+{y}')
-
-    def _create_widgets(self):
-        """Initializes and places all GUI elements."""
-        # Configure a consistent font
-        self.default_font = ("Segoe UI", 10)
-        self.title_font = ("Segoe UI", 12, "bold")
-        self.app_title_font = ("Segoe UI", 16, "bold") # Larger font for app title
-        self.footer_font = ("Segoe UI", 8) # Smaller font for footer
-
-        # Header frame for title
-        header_frame = tk.Frame(self.master, padx=15, pady=10)
-        header_frame.pack(fill="x")
-
-        self.app_title_label = tk.Label(header_frame, text="Download Notifier - Enhanced", font=self.app_title_font)
-        self.app_title_label.pack(side="left", expand=True, anchor="w") # Align left
-
-        # Main content frame with padding
-        main_content_frame = tk.Frame(self.master, padx=15, pady=10)
-        main_content_frame.pack(fill="both", expand=True)
-
-        # Settings frame
-        settings_frame = tk.LabelFrame(main_content_frame, text="Settings", font=self.default_font, padx=10, pady=5)
-        settings_frame.pack(fill="x", pady=(0, 10))
-
-        # Notification settings
-        notifications_frame = tk.Frame(settings_frame)
-        notifications_frame.pack(fill="x", pady=2)
+    
+    def toggle_theme(self):
+        """Toggle between light and dark themes"""
+        self.current_theme = "dark" if self.current_theme == "light" else "light"
+        self.theme_var.set(self.current_theme)
+        self.apply_theme()
+    
+    def apply_theme(self):
+        """Apply the current theme to all widgets"""
+        theme = DARK_THEME if self.current_theme == "dark" else LIGHT_THEME
         
-        self.sound_checkbox = tk.Checkbutton(
-            notifications_frame, 
-            text="Enable sound notifications", 
-            variable=self.notification_sound_enabled,
-            font=self.default_font
-        )
-        self.sound_checkbox.pack(side="left", padx=(0, 20))
+        # Update theme button text
+        self.theme_button.config(text="☀️ Light" if self.current_theme == "dark" else "🌙 Dark")
         
-        self.popup_checkbox = tk.Checkbutton(
-            notifications_frame, 
-            text="Enable popup notifications", 
-            variable=self.notification_popup_enabled,
-            font=self.default_font
-        )
-        self.popup_checkbox.pack(side="left")
-
-        # File size filter
-        size_frame = tk.Frame(settings_frame)
-        size_frame.pack(fill="x", pady=2)
+        # Apply theme to main components
+        self.master.config(bg=theme["bg"])
+        self.main_container.config(bg=theme["bg"])
         
-        tk.Label(size_frame, text="Minimum file size (MB):", font=self.default_font).pack(side="left", padx=(0, 5))
-        self.size_spinbox = tk.Spinbox(
-            size_frame,
-            from_=0.1,
-            to=1000.0,
-            increment=0.5,
-            textvariable=self.min_file_size,
-            width=8,
-            font=self.default_font
-        )
-        self.size_spinbox.pack(side="left")
-
-        # Path selection frame
-        path_frame = tk.Frame(main_content_frame, pady=5)
-        path_frame.pack(fill="x")
-
-        tk.Label(path_frame, text="Monitor Directories (comma-separated):", font=self.default_font).pack(side="left", padx=(0, 5))
-        self.path_entry = tk.Entry(path_frame, textvariable=self.monitor_path, font=self.default_font, relief="flat", bd=2)
-        self.path_entry.pack(side="left", expand=True, fill="x", padx=(0, 5))
-        self.browse_button = tk.Button(
-            path_frame,
-            text="Browse",
-            command=self._browse_directory,
-            font=self.default_font,
-            relief="raised",
-            bd=2,
-            padx=10,
-            pady=2
-        )
-        self.browse_button.pack(side="left")
-
-        # Control buttons frame
-        button_frame = tk.Frame(main_content_frame, pady=10)
-        button_frame.pack(fill="x")
-
-        self.start_button = tk.Button(
-            button_frame,
-            text="Start Monitoring",
-            command=self.start_monitoring,
-            font=self.title_font,
-            relief="raised",
-            bd=3,
-            padx=15,
-            pady=8
-        )
-        self.start_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
-
-        self.stop_button = tk.Button(
-            button_frame,
-            text="Stop Monitoring",
-            command=self.stop_monitoring,
-            font=self.title_font,
-            relief="raised",
-            bd=3,
-            padx=15,
-            pady=8,
-            state="disabled"
-        )
-        self.stop_button.pack(side="left", expand=True, fill="x", padx=(5, 0))
-
-        # Stop Alarm Button
-        self.stop_alarm_button = tk.Button(
-            main_content_frame,
-            text="Stop Alarm",
-            command=self.stop_alarm,
-            font=self.title_font,
-            relief="raised",
-            bd=3,
-            padx=15,
-            pady=8,
-            state="disabled" # Disabled by default
-        )
-        self.stop_alarm_button.pack(fill="x", pady=(5, 5)) # Adjusted pady for spacing
-
-        # Status label
-        self.status_label = tk.Label(main_content_frame, text="Ready to monitor...", wraplength=550, justify="left", font=self.default_font)
-        self.status_label.pack(padx=5, pady=(0, 10), fill="x", expand=True)
-
-        # Download history/log
-        log_frame = tk.LabelFrame(main_content_frame, text="Activity Log", font=self.default_font, bd=2, relief="groove")
-        log_frame.pack(fill="both", expand=True, pady=(0, 10))
-
-        # Create frame for text widget and scrollbar
-        text_frame = tk.Frame(log_frame)
-        text_frame.pack(fill="both", expand=True, padx=5, pady=5)
-
-        self.log_text = tk.Text(text_frame, height=8, width=60, state="disabled", font=("Consolas", 9), wrap="word")
-        self.log_text.pack(side="left", fill="both", expand=True)
-        self.log_text.tag_config("download", foreground="blue")
-        self.log_text.tag_config("error", foreground="red")
-        self.log_text.tag_config("info", foreground="grey") # New tag for general info
-
-        # Scrollbar for log text
-        scrollbar = tk.Scrollbar(text_frame, command=self.log_text.yview)
-        scrollbar.pack(side="right", fill="y")
-        self.log_text.config(yscrollcommand=scrollbar.set)
-
-        # Log control frame
-        log_control_frame = tk.Frame(log_frame)
-        log_control_frame.pack(fill="x", padx=5, pady=(0, 5))
+        # Update styles
+        self.configure_styles()
         
-        self.clear_log_button = tk.Button(
-            log_control_frame,
-            text="Clear Log",
-            command=self._clear_log,
-            font=self.default_font,
-            relief="raised",
-            bd=2,
-            padx=10,
-            pady=2
-        )
-        self.clear_log_button.pack(side="left")
+        # Apply to all widgets recursively
+        self.apply_theme_to_widget(self.master, theme)
+    
+    def apply_theme_to_widget(self, widget, theme):
+        """Recursively apply theme to widget and its children"""
+        try:
+            widget_class = widget.winfo_class()
+            
+            if widget_class in ["Frame", "Toplevel"]:
+                widget.config(bg=theme["bg"])
+            elif widget_class == "Label":
+                widget.config(bg=theme["bg"], fg=theme["fg"])
+            elif widget_class == "Button":
+                self.style_button(widget, theme)
+            elif widget_class == "Entry":
+                widget.config(bg=theme["entry_bg"], fg=theme["entry_fg"],
+                             insertbackground=theme["fg"])
+            elif widget_class == "Text":
+                widget.config(bg=theme["text_bg"], fg=theme["text_fg"],
+                             insertbackground=theme["fg"])
+            elif widget_class == "Listbox":
+                widget.config(bg=theme["text_bg"], fg=theme["text_fg"])
+            elif widget_class == "LabelFrame":
+                widget.config(bg=theme["bg"], fg=theme["fg"])
+            elif widget_class == "Checkbutton":
+                widget.config(bg=theme["bg"], fg=theme["fg"],
+                             activebackground=theme["hover"])
+            elif widget_class == "Radiobutton":
+                widget.config(bg=theme["bg"], fg=theme["fg"],
+                             activebackground=theme["hover"])
+            elif widget_class == "Spinbox":
+                widget.config(bg=theme["entry_bg"], fg=theme["entry_fg"])
+            
+            # Apply to children
+            for child in widget.winfo_children():
+                self.apply_theme_to_widget(child, theme)
+                
+        except tk.TclError:
+            pass  # Some widgets don't support certain config options
+    
+    def style_button(self, button, theme):
+        """Apply theme-specific styling to buttons"""
+        button_text = button.cget("text")
         
-        self.save_log_button = tk.Button(
-            log_control_frame,
-            text="Save Log",
-            command=self._save_log,
-            font=self.default_font,
-            relief="raised",
-            bd=2,
-            padx=10,
-            pady=2
+        if "Start" in button_text:
+            button.config(bg=theme["accent"], fg="white",
+                         activebackground=theme["accent_hover"])
+        elif "Stop" in button_text:
+            button.config(bg=theme["danger"], fg="white",
+                         activebackground=theme["danger_hover"])
+        elif button == self.theme_button:
+            button.config(bg=theme["secondary_bg"], fg=theme["fg"],
+                         activebackground=theme["hover"])
+        else:
+            button.config(bg=theme["secondary_bg"], fg=theme["fg"],
+                         activebackground=theme["hover"])
+    
+    def show_status(self, message, level="info", duration=0):
+        """Show status message with optional auto-clear"""
+        colors = {
+            "info": "#2196F3",
+            "success": "#4CAF50", 
+            "warning": "#ff9800",
+            "error": "#f44336"
+        }
+        
+        self.status_label.config(text=message, fg=colors.get(level, "#333333"))
+        
+        if duration > 0:
+            if self.status_timer:
+                self.master.after_cancel(self.status_timer)
+            self.status_timer = self.master.after(duration, 
+                lambda: self.status_label.config(text="Ready to monitor downloads...", 
+                                                fg="#333333"))
+    
+    def add_quick_path(self, path):
+        """Add a quick path to monitoring directories"""
+        current = self.monitor_path.get()
+        if current and current.strip():
+            if path not in current:
+                self.monitor_path.set(f"{current}, {path}")
+        else:
+            self.monitor_path.set(path)
+        
+        self.show_status(f"Added: {os.path.basename(path)}", "success", 2000)
+    
+    def browse_directory(self):
+        """Enhanced directory browser"""
+        selected_dir = filedialog.askdirectory(
+            initialdir=self.monitor_path.get().split(',')[0].strip() if self.monitor_path.get() else os.path.expanduser("~"),
+            title="Select Directory to Monitor"
         )
-        self.save_log_button.pack(side="left", padx=(5, 0))
-
-        # Footer frame
-        footer_frame = tk.Frame(self.master, padx=15, pady=5)
-        footer_frame.pack(fill="x", side="bottom")
-
-        # About link in footer (now the only element in the footer)
-        self.about_link_label = tk.Label(
-            footer_frame,
-            text="About",
-            font=self.footer_font,
-            cursor="hand2", # Changes cursor to a hand on hover
-            relief="flat" # No border
-        )
-        # Pack this label in the center of the footer frame
-        self.about_link_label.pack(side="bottom", anchor="center", pady=(0,0)) # Centered horizontally
-        self.about_link_label.bind("<Button-1>", lambda e: self._show_about())
-        self.about_link_label.bind("<Enter>", self._on_about_link_enter)
-        self.about_link_label.bind("<Leave>", self._on_about_link_leave)
-
-        # List of widgets to apply theme to
-        self.themable_widgets = [
-            self.master, header_frame, main_content_frame, path_frame, button_frame, 
-            log_frame, text_frame, log_control_frame, footer_frame, settings_frame,
-            notifications_frame, size_frame,
-            self.app_title_label, self.status_label, self.log_text, self.path_entry,
-            self.start_button, self.stop_button, self.browse_button,
-            self.stop_alarm_button, self.about_link_label, self.sound_checkbox,
-            self.popup_checkbox, self.size_spinbox, self.clear_log_button, self.save_log_button
-        ]
-        # Add labels in path_frame and size_frame
-        for widget in path_frame.winfo_children() + size_frame.winfo_children():
-            if isinstance(widget, tk.Label):
-                self.themable_widgets.append(widget)
+        if selected_dir:
+            self.add_quick_path(selected_dir)
+    
+    def test_alarm_sound(self):
+        """Test the alarm sound"""
+        if os.path.exists(ALARM_SOUND_FILE):
+            threading.Thread(target=self._play_test_sound, daemon=True).start()
+        else:
+            self.show_status("Alarm sound file not found!", "error", 3000)
+    
+    def _play_test_sound(self):
+        """Play test sound in background thread"""
+        try:
+            pygame.mixer.music.load(ALARM_SOUND_FILE)
+            pygame.mixer.music.play()
+            self.show_status("Playing test sound...", "info", 2000)
+        except Exception as e:
+            self.show_status(f"Sound test failed: {e}", "error", 3000)
 
     def _apply_theme(self, theme_colors):
         """Applies the specified theme colors to the widgets."""
