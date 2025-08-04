@@ -1220,6 +1220,8 @@ class DownloadNotifierApp:
             pygame.mixer.music.play()
             self.show_status("Playing test sound...", "info", 2000)
         except Exception as e:
+            self.show_status(f"Sound test failed: {e}", "error", 3000)
+
     def log_message(self, message, level="info"):
         """Enhanced logging with filtering and formatting"""
         timestamp = datetime.now().strftime("%H:%M:%S")
