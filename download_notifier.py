@@ -1217,17 +1217,9 @@ class DownloadNotifierApp:
         self.apply_theme()
     
     def apply_theme(self):
-        """Apply the current theme to all widgets"""
-        theme = DARK_THEME if self.current_theme == "dark" else LIGHT_THEME
-        
-        # Update theme button text
-        self.theme_button.config(text="☀️ Light" if self.current_theme == "dark" else "🌙 Dark")
-        
-        # Apply theme to main components
-        self.master.config(bg=theme["bg"])
-        self.main_container.config(bg=theme["bg"])
-        
-        # Update styles
+        """Apply the current theme to all widgets using enhanced theme system"""
+        # Use enhanced theme system
+        self.apply_enhanced_theme()
         self.configure_styles()
         
         # Apply to all widgets recursively
