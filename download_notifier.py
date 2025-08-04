@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 import os
 import time
 import threading
@@ -11,6 +11,8 @@ import requests
 from urllib.parse import urlparse
 import re
 import sqlite3 # Added for potential Telegram DB access, though highly experimental
+import sys
+from pathlib import Path
 
 # --- Configuration ---
 # Default download directory (can be changed by user)
@@ -19,6 +21,10 @@ DEFAULT_DOWNLOAD_DIR = os.path.join(os.path.expanduser("~"), "Downloads")
 # Pygame supports both WAV and MP3.
 # Make sure you have an alarm.wav or alarm.mp3 file in the same directory as this script.
 ALARM_SOUND_FILE = "alarm.wav" # You can change this to "alarm.mp3" if you prefer
+
+# File size thresholds for notifications (in MB)
+MIN_FILE_SIZE_MB = 1  # Only notify for files larger than 1MB
+MAX_PROCESSING_TIME = 300  # Maximum time to wait for a file to complete (5 minutes)
 
 # --- Theme Configuration ---
 LIGHT_THEME = {
@@ -270,6 +276,7 @@ class SizeAwareDownloadHandler(FileSystemEventHandler):
             ".idm", ".idm.tmp", ".idm.bak", ".dwnl", ".inprogress",
             ".downloading", ".temp", ".partial", ".resume",
             ".unconfirmed", ".opdownload", ".!ut", ".td", # .td for Telegram temp
+            ".crswap", ".swp", ".lock", ".~"
         )
         
         for ext in temp_extensions:
@@ -279,8 +286,17 @@ class SizeAwareDownloadHandler(FileSystemEventHandler):
         # Common temporary file patterns in filenames
         if (file_name_lower.startswith("downloading_") or 
             file_name_lower.startswith("temp_") or
+            file_name_lower.startswith("~") or
             "_downloading" in file_name_lower or
-            file_name.startswith(".")): # Hidden files often used as temp
+            file_name.startswith(".")):  # Hidden files often used as temp
+            return True
+            
+        # Check file size - very small files might be incomplete
+        try:
+            file_size = os.path.getsize(file_path)
+            if file_size < 1024:  # Less than 1KB, might be a stub
+                return True
+        except (OSError, FileNotFoundError):
             return True
             
         return False
