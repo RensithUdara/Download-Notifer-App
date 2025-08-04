@@ -35,43 +35,73 @@ WINDOW_MIN_WIDTH = 800
 WINDOW_MIN_HEIGHT = 600
 SETTINGS_FILE = "settings.json"
 
-# --- Enhanced Theme Configuration ---
+# --- Enhanced Creative Theme Configuration ---
+CREATIVE_THEMES = {
+    "ocean": {
+        "name": "Ocean Breeze",
+        "bg": "#0d1b2a", "fg": "#ffffff", "secondary_bg": "#1b263b",
+        "accent": "#00b4d8", "accent_hover": "#0096c7", "danger": "#e63946",
+        "danger_hover": "#d00000", "warning": "#f77f00", "info": "#00b4d8",
+        "success": "#06ffa5", "text_bg": "#1e3a5f", "text_fg": "#ffffff",
+        "entry_bg": "#233759", "entry_fg": "#ffffff", "border": "#457b9d",
+        "hover": "#2a4a6b", "gradient_start": "#0d1b2a", "gradient_end": "#1b263b"
+    },
+    "sunset": {
+        "name": "Sunset Glow",
+        "bg": "#2d1b69", "fg": "#ffffff", "secondary_bg": "#3c2777",
+        "accent": "#ff6b35", "accent_hover": "#e55a31", "danger": "#e63946",
+        "danger_hover": "#d00000", "warning": "#ffc300", "info": "#7209b7",
+        "success": "#06ffa5", "text_bg": "#4a2c85", "text_fg": "#ffffff",
+        "entry_bg": "#5d3493", "entry_fg": "#ffffff", "border": "#7f4fc9",
+        "hover": "#6a3ca1", "gradient_start": "#2d1b69", "gradient_end": "#ff6b35"
+    },
+    "forest": {
+        "name": "Forest Green",
+        "bg": "#1b2d1b", "fg": "#ffffff", "secondary_bg": "#2d4a2d",
+        "accent": "#52b788", "accent_hover": "#40916c", "danger": "#e63946",
+        "danger_hover": "#d00000", "warning": "#f77f00", "info": "#52b788",
+        "success": "#06ffa5", "text_bg": "#3d5a3d", "text_fg": "#ffffff",
+        "entry_bg": "#4a6b4a", "entry_fg": "#ffffff", "border": "#74c69d",
+        "hover": "#5a7c5a", "gradient_start": "#1b2d1b", "gradient_end": "#52b788"
+    },
+    "cyberpunk": {
+        "name": "Cyberpunk",
+        "bg": "#0a0a0a", "fg": "#00ff9f", "secondary_bg": "#1a1a1a",
+        "accent": "#ff0080", "accent_hover": "#e6006b", "danger": "#ff073a",
+        "danger_hover": "#e6003a", "warning": "#ffb700", "info": "#00b4ff",
+        "success": "#00ff9f", "text_bg": "#2a2a2a", "text_fg": "#00ff9f",
+        "entry_bg": "#3a3a3a", "entry_fg": "#00ff9f", "border": "#ff0080",
+        "hover": "#4a4a4a", "gradient_start": "#0a0a0a", "gradient_end": "#ff0080"
+    },
+    "candy": {
+        "name": "Candy Pop",
+        "bg": "#ffeaa7", "fg": "#2d3436", "secondary_bg": "#ffffff",
+        "accent": "#fd79a8", "accent_hover": "#e84393", "danger": "#e17055",
+        "danger_hover": "#d63031", "warning": "#fdcb6e", "info": "#74b9ff",
+        "success": "#00b894", "text_bg": "#ffffff", "text_fg": "#2d3436",
+        "entry_bg": "#ffffff", "entry_fg": "#2d3436", "border": "#fd79a8",
+        "hover": "#f8f9fa", "gradient_start": "#ffeaa7", "gradient_end": "#fd79a8"
+    }
+}
+
 DARK_THEME = {
-    "bg": "#2b2b2b",
-    "fg": "#ffffff",
-    "secondary_bg": "#3c3c3c",
-    "accent": "#4CAF50",
-    "accent_hover": "#45a049",
-    "danger": "#f44336",
-    "danger_hover": "#da190b",
-    "warning": "#ff9800",
-    "info": "#2196F3",
-    "success": "#4CAF50",
-    "text_bg": "#404040",
-    "text_fg": "#ffffff",
-    "entry_bg": "#505050",
-    "entry_fg": "#ffffff",
-    "border": "#555555",
-    "hover": "#4a4a4a"
+    "name": "Professional Dark",
+    "bg": "#2b2b2b", "fg": "#ffffff", "secondary_bg": "#3c3c3c",
+    "accent": "#4CAF50", "accent_hover": "#45a049", "danger": "#f44336",
+    "danger_hover": "#da190b", "warning": "#ff9800", "info": "#2196F3",
+    "success": "#4CAF50", "text_bg": "#404040", "text_fg": "#ffffff",
+    "entry_bg": "#505050", "entry_fg": "#ffffff", "border": "#555555",
+    "hover": "#4a4a4a", "gradient_start": "#2b2b2b", "gradient_end": "#3c3c3c"
 }
 
 LIGHT_THEME = {
-    "bg": "#f5f5f5",
-    "fg": "#333333",
-    "secondary_bg": "#ffffff",
-    "accent": "#4CAF50",
-    "accent_hover": "#45a049",
-    "danger": "#f44336",
-    "danger_hover": "#da190b",
-    "warning": "#ff9800",
-    "info": "#2196F3",
-    "success": "#4CAF50",
-    "text_bg": "#ffffff",
-    "text_fg": "#333333",
-    "entry_bg": "#ffffff",
-    "entry_fg": "#333333",
-    "border": "#cccccc",
-    "hover": "#e0e0e0"
+    "name": "Professional Light", 
+    "bg": "#f5f5f5", "fg": "#333333", "secondary_bg": "#ffffff",
+    "accent": "#4CAF50", "accent_hover": "#45a049", "danger": "#f44336",
+    "danger_hover": "#da190b", "warning": "#ff9800", "info": "#2196F3",
+    "success": "#4CAF50", "text_bg": "#ffffff", "text_fg": "#333333",
+    "entry_bg": "#ffffff", "entry_fg": "#333333", "border": "#cccccc",
+    "hover": "#e0e0e0", "gradient_start": "#f5f5f5", "gradient_end": "#ffffff"
 }
 
 # --- Enhanced File System Event Handler with Size Checking ---
@@ -550,13 +580,47 @@ class DownloadNotifierApp:
         }
         
         # Settings
-        self.current_theme = "light"
+        self.default_settings = {
+            "sound_enabled": True,
+            "popup_enabled": True,
+            "min_file_size": MIN_FILE_SIZE_MB,
+            "auto_clear_log": False,
+            "show_file_details": True,
+            "current_theme": "dark",
+            "window_width": 950,
+            "window_height": 700,
+            "always_on_top": False,
+            "start_minimized": False,
+            "auto_start_monitoring": False,
+            "notification_duration": 5,
+            "max_recent_downloads": 50,
+            "enable_statistics": True,
+            "enable_gradient": True,
+            "animation_speed": "normal",
+            "enable_sound_effects": True,
+            "enable_particle_effects": False,
+            "enable_notifications_history": True,
+            "auto_backup_settings": True,
+            "enable_dark_mode_schedule": False,
+            "dark_mode_start": "20:00",
+            "dark_mode_end": "06:00"
+        }
+        self.current_theme = self.default_settings["current_theme"]
         self.settings = self.load_settings()
         self.notification_sound_enabled = tk.BooleanVar(value=self.settings.get("sound_enabled", True))
         self.notification_popup_enabled = tk.BooleanVar(value=self.settings.get("popup_enabled", True))
         self.min_file_size = tk.DoubleVar(value=self.settings.get("min_file_size", MIN_FILE_SIZE_MB))
         self.auto_clear_log = tk.BooleanVar(value=self.settings.get("auto_clear_log", False))
         self.show_file_details = tk.BooleanVar(value=self.settings.get("show_file_details", True))
+        
+        # New creative features
+        self.enable_gradient = tk.BooleanVar(value=self.settings.get("enable_gradient", True))
+        self.animation_speed = tk.StringVar(value=self.settings.get("animation_speed", "normal"))
+        self.enable_sound_effects = tk.BooleanVar(value=self.settings.get("enable_sound_effects", True))
+        self.always_on_top = tk.BooleanVar(value=self.settings.get("always_on_top", False))
+        
+        # Notifications history
+        self.notifications_history = []
         
         # Initialize Pygame mixer
         if not pygame.mixer.get_init():
