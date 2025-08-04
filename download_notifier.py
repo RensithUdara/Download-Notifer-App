@@ -556,6 +556,10 @@ class DownloadNotifierApp:
         self.app_title_label = tk.Label(header_frame, text="Download Notifier - Enhanced", font=self.app_title_font)
         self.app_title_label.pack(side="left", expand=True, anchor="w") # Align left
 
+        # Main content frame with padding
+        main_content_frame = tk.Frame(self.master, padx=15, pady=10)
+        main_content_frame.pack(fill="both", expand=True)
+
         # Settings frame
         settings_frame = tk.LabelFrame(main_content_frame, text="Settings", font=self.default_font, padx=10, pady=5)
         settings_frame.pack(fill="x", pady=(0, 10))
@@ -595,10 +599,6 @@ class DownloadNotifierApp:
             font=self.default_font
         )
         self.size_spinbox.pack(side="left")
-
-        # Main content frame with padding
-        main_content_frame = tk.Frame(self.master, padx=15, pady=10)
-        main_content_frame.pack(fill="both", expand=True)
 
         # Path selection frame
         path_frame = tk.Frame(main_content_frame, pady=5)
