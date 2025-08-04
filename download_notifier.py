@@ -1222,6 +1222,611 @@ class DownloadNotifierApp:
         except Exception as e:
             self.show_status(f"Sound test failed: {e}", "error", 3000)
 
+    def log_message(self, message, level="info"):
+        """Enhanced logging with filtering and formatting"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        formatted_message = f"[{timestamp}] {message}\n"
+        
+        # Apply to main log
+        self.status_text.config(state="normal")
+        self.status_text.insert(tk.END, formatted_message, level)
+        self.status_text.see(tk.END)
+        self.status_text.config(state="disabled")
+        
+        # Apply to activity tab log
+        self.log_text.config(state="normal")
+        
+        # Insert timestamp
+        self.log_text.insert(tk.END, f"[{timestamp}] ", "timestamp")
+        
+        # Insert message with appropriate tag
+        level_icons = {
+            "download": "📥 ",
+            "error": "❌ ",
+            "warning": "⚠️ ",
+            "info": "ℹ️ "
+        }
+        icon = level_icons.get(level, "")
+        self.log_text.insert(tk.END, f"{icon}{message}\n", level)
+        
+        self.log_text.see(tk.END)
+        self.log_text.config(state="disabled")
+        
+        # Auto-clear if enabled and log is too long
+        if self.auto_clear_log.get():
+            line_count = int(self.log_text.index('end-1c').split('.')[0])
+            if line_count > 1000:
+                self.clear_log(auto=True)
+    
+    def filter_log(self):
+        """Filter log display based on selection"""
+        filter_value = self.log_filter.get()
+        # This would require storing log entries separately and rebuilding
+        # For now, just show a status message
+        self.show_status(f"Showing {filter_value} entries", "info", 2000)
+    
+    def clear_log(self, auto=False):
+        """Clear the activity log"""
+        self.log_text.config(state="normal")
+        self.log_text.delete(1.0, tk.END)
+        self.log_text.config(state="disabled")
+        
+        self.status_text.config(state="normal")
+        self.status_text.delete(1.0, tk.END)
+        self.status_text.config(state="disabled")
+        
+        if not auto:
+            self.log_message("Log cleared manually", "info")
+        else:
+            self.log_message("Log auto-cleared (1000+ entries)", "info")
+    
+    def save_log(self):
+        """Save log to file"""
+        try:
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".txt",
+                filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+                title="Save Activity Log",
+                initialname=f"download_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            )
+            if filename:
+                with open(filename, 'w', encoding='utf-8') as f:
+                    log_content = self.log_text.get(1.0, tk.END)
+                    f.write(f"Download Notifier Pro v{APP_VERSION} - Activity Log\n")
+                    f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write("=" * 50 + "\n\n")
+                    f.write(log_content)
+                
+                self.show_status(f"Log saved: {os.path.basename(filename)}", "success", 3000)
+        except Exception as e:
+            self.show_status(f"Save failed: {e}", "error", 3000)
+    
+    def export_log(self):
+        """Export log in multiple formats"""
+        try:
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".json",
+                filetypes=[
+                    ("JSON files", "*.json"),
+                    ("CSV files", "*.csv"),
+                    ("Text files", "*.txt")
+                ],
+                title="Export Activity Log",
+                initialname=f"download_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            )
+            
+            if filename:
+                ext = os.path.splitext(filename)[1].lower()
+                
+                if ext == ".json":
+                    self.export_log_json(filename)
+                elif ext == ".csv":
+                    self.export_log_csv(filename)
+                else:
+                    self.save_log()  # Fallback to text
+                    
+        except Exception as e:
+            self.show_status(f"Export failed: {e}", "error", 3000)
+    
+    def export_log_json(self, filename):
+        """Export log as JSON"""
+        log_data = {
+            "metadata": {
+                "version": APP_VERSION,
+                "exported": datetime.now().isoformat(),
+                "session_start": datetime.fromtimestamp(self.statistics["session_start"]).isoformat()
+            },
+            "statistics": self.statistics,
+            "downloads": self.download_history
+        }
+        
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(log_data, f, indent=2, ensure_ascii=False)
+        
+        self.show_status(f"Exported JSON: {os.path.basename(filename)}", "success", 3000)
+    
+    def export_log_csv(self, filename):
+        """Export log as CSV"""
+        import csv
+        
+        with open(filename, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(["Timestamp", "Filename", "Size", "Path", "Status"])
+            
+            for download in self.download_history:
+                writer.writerow([
+                    download.get("timestamp", ""),
+                    download.get("filename", ""),
+                    download.get("size", ""),
+                    download.get("path", ""),
+                    download.get("status", "")
+                ])
+        
+        self.show_status(f"Exported CSV: {os.path.basename(filename)}", "success", 3000)
+    
+    def update_statistics_display(self):
+        """Update the statistics display"""
+        # Calculate session duration
+        duration = time.time() - self.statistics["session_start"]
+        hours, remainder = divmod(duration, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        duration_str = f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
+        
+        # Update statistics labels
+        self.stat_session_duration.config(text=duration_str)
+        self.stat_total_downloads.config(text=str(self.statistics["total_downloads"]))
+        
+        # Format total size
+        total_bytes = self.statistics["total_size"]
+        if total_bytes >= 1024**3:
+            size_str = f"{total_bytes / (1024**3):.2f} GB"
+        elif total_bytes >= 1024**2:
+            size_str = f"{total_bytes / (1024**2):.2f} MB"
+        elif total_bytes >= 1024:
+            size_str = f"{total_bytes / 1024:.2f} KB"
+        else:
+            size_str = f"{total_bytes} bytes"
+        
+        self.stat_total_size.config(text=size_str)
+        
+        # Calculate average size
+        if self.statistics["total_downloads"] > 0:
+            avg_bytes = self.statistics["total_size"] / self.statistics["total_downloads"]
+            if avg_bytes >= 1024**2:
+                avg_str = f"{avg_bytes / (1024**2):.2f} MB"
+            elif avg_bytes >= 1024:
+                avg_str = f"{avg_bytes / 1024:.2f} KB"
+            else:
+                avg_str = f"{avg_bytes:.0f} bytes"
+        else:
+            avg_str = "N/A"
+        
+        self.stat_avg_size.config(text=avg_str)
+        
+        # Update recent downloads tree
+        self.update_recent_downloads()
+    
+    def update_recent_downloads(self):
+        """Update the recent downloads tree view"""
+        # Clear existing items
+        for item in self.recent_tree.get_children():
+            self.recent_tree.delete(item)
+        
+        # Add recent downloads (last 50)
+        recent_downloads = self.download_history[-50:] if len(self.download_history) > 50 else self.download_history
+        
+        for download in reversed(recent_downloads):  # Most recent first
+            self.recent_tree.insert("", "end", values=(
+                download.get("timestamp", ""),
+                download.get("filename", ""),
+                download.get("size_formatted", ""),
+                download.get("directory", "")
+            ))
+    
+    def export_statistics(self):
+        """Export statistics to file"""
+        try:
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".json",
+                filetypes=[("JSON files", "*.json"), ("Text files", "*.txt")],
+                title="Export Statistics",
+                initialname=f"download_stats_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            )
+            
+            if filename:
+                stats_data = {
+                    "export_time": datetime.now().isoformat(),
+                    "session_statistics": self.statistics,
+                    "download_history": self.download_history,
+                    "settings": {
+                        "min_file_size": self.min_file_size.get(),
+                        "monitored_paths": self.monitor_path.get().split(',')
+                    }
+                }
+                
+                with open(filename, 'w', encoding='utf-8') as f:
+                    json.dump(stats_data, f, indent=2, ensure_ascii=False)
+                
+                self.show_status(f"Statistics exported: {os.path.basename(filename)}", "success", 3000)
+                
+        except Exception as e:
+            self.show_status(f"Export failed: {e}", "error", 3000)
+    
+    def clear_statistics(self):
+        """Clear statistics and download history"""
+        if messagebox.askyesno("Clear Statistics", 
+                              "Are you sure you want to clear all statistics and download history?"):
+            self.statistics = {
+                "total_downloads": 0,
+                "total_size": 0,
+                "session_start": time.time()
+            }
+            self.download_history.clear()
+            self.update_statistics_display()
+            self.show_status("Statistics cleared", "info", 2000)
+    
+    def reset_settings(self):
+        """Reset all settings to defaults"""
+        if messagebox.askyesno("Reset Settings", 
+                              "Are you sure you want to reset all settings to defaults?"):
+            self.notification_sound_enabled.set(True)
+            self.notification_popup_enabled.set(True)
+            self.min_file_size.set(MIN_FILE_SIZE_MB)
+            self.auto_clear_log.set(False)
+            self.show_file_details.set(True)
+            self.current_theme = "light"
+            self.theme_var.set("light")
+            self.apply_theme()
+    def start_monitoring(self):
+        """Enhanced monitoring with better UI feedback"""
+        paths_to_monitor_str = self.monitor_path.get()
+        paths = [p.strip() for p in paths_to_monitor_str.split(',') if p.strip()]
+
+        if not paths:
+            messagebox.showerror("Error", "No directories specified for monitoring.")
+            return
+
+        if self.is_monitoring:
+            self.show_status("Already monitoring", "warning", 2000)
+            return
+
+        # Update global MIN_FILE_SIZE_MB from settings
+        global MIN_FILE_SIZE_MB
+        MIN_FILE_SIZE_MB = self.min_file_size.get()
+
+        # Create enhanced handler
+        self.event_handler = SizeAwareDownloadHandler(self)
+        self.observers = []
+        monitoring_successful_paths = []
+
+        for path_to_monitor in paths:
+            if not os.path.isdir(path_to_monitor):
+                self.log_message(f"Invalid directory: {path_to_monitor}", "error")
+                continue
+                
+            try:
+                observer = Observer()
+                observer.schedule(self.event_handler, path_to_monitor, recursive=True)
+                observer.start()
+                self.observers.append(observer)
+                monitoring_successful_paths.append(path_to_monitor)
+                self.log_message(f"Started monitoring: {path_to_monitor}", "info")
+            except Exception as e:
+                self.log_message(f"Failed to monitor {path_to_monitor}: {e}", "error")
+
+        if monitoring_successful_paths:
+            self.is_monitoring = True
+            self.start_button.config(state="disabled")
+            self.stop_button.config(state="normal")
+            
+            # Update status indicator
+            self.status_indicator.config(text="● Running", fg="#4CAF50")
+            self.connection_label.config(fg="#4CAF50")
+            
+            paths_str = ", ".join([os.path.basename(p) for p in monitoring_successful_paths])
+            self.show_status(f"Monitoring {len(monitoring_successful_paths)} director{'y' if len(monitoring_successful_paths) == 1 else 'ies'}: {paths_str}", "success")
+            
+            self.log_message(f"Enhanced monitoring started for {len(monitoring_successful_paths)} directories", "info")
+        else:
+            messagebox.showerror("Error", "No valid directories found to start monitoring.")
+            self.show_status("Monitoring failed: No valid directories", "error", 3000)
+
+    def stop_monitoring(self):
+        """Enhanced stop monitoring with better feedback"""
+        if not self.is_monitoring:
+            self.show_status("Not currently monitoring", "warning", 2000)
+            return
+
+        self.show_status("Stopping monitoring...", "info")
+        
+        for observer in self.observers:
+            observer.stop()
+        for observer in self.observers:
+            observer.join()
+        self.observers = []
+
+        if self.event_handler:
+            self.event_handler.stop_processing()
+            self.event_handler = None
+
+        self.is_monitoring = False
+        self.start_button.config(state="normal")
+        self.stop_button.config(state="disabled")
+        
+        # Update status indicator
+        self.status_indicator.config(text="● Stopped", fg="#f44336")
+        self.connection_label.config(fg="#f44336")
+        
+        self.show_status("Monitoring stopped", "info", 2000)
+        self.log_message("Monitoring stopped by user", "info")
+
+    def update_status(self, message):
+        """Legacy compatibility method"""
+        self.show_status(message, "info")
+
+    def _log_message(self, message, tag=None):
+        """Legacy compatibility method"""
+        level_map = {"download": "download", "error": "error", "info": "info"}
+        self.log_message(message, level_map.get(tag, "info"))
+
+    def notify_download_complete(self, file_path):
+        """Enhanced download completion notification"""
+        download_name = os.path.basename(file_path)
+        
+        try:
+            file_size = os.path.getsize(file_path)
+            
+            # Format size
+            if file_size >= 1024**3:
+                size_str = f"{file_size / (1024**3):.2f} GB"
+            elif file_size >= 1024**2:
+                size_str = f"{file_size / (1024**2):.2f} MB"
+            elif file_size >= 1024:
+                size_str = f"{file_size / 1024:.2f} KB"
+            else:
+                size_str = f"{file_size:,} bytes"
+                
+            # Update statistics
+            self.statistics["total_downloads"] += 1
+            self.statistics["total_size"] += file_size
+            
+            # Add to download history
+            download_record = {
+                "timestamp": datetime.now().strftime("%H:%M:%S"),
+                "filename": download_name,
+                "size": file_size,
+                "size_formatted": size_str,
+                "path": file_path,
+                "directory": os.path.dirname(file_path),
+                "status": "completed"
+            }
+            self.download_history.append(download_record)
+            
+            # Create notification message
+            if self.show_file_details.get():
+                notification_msg = f"📥 Download Complete!\n\nFile: {download_name}\nSize: {size_str}\nLocation: {os.path.dirname(file_path)}"
+            else:
+                notification_msg = f"📥 Download Complete!\n\n{download_name}\nSize: {size_str}"
+            
+            # Log the completion
+            self.log_message(f"Download completed: {download_name} ({size_str})", "download")
+            
+            # Show notifications
+            self.master.after(0, lambda: self._show_notification_and_play_sound(download_name, notification_msg))
+            
+            # Update statistics display if on statistics tab
+            self.master.after(100, self.update_statistics_display)
+            
+        except Exception as e:
+            self.log_message(f"Error processing completed download {download_name}: {e}", "error")
+            # Fallback notification
+            self.master.after(0, lambda: self._show_notification_and_play_sound(download_name))
+
+    def _show_notification_and_play_sound(self, download_name, notification_msg=None):
+        """Enhanced notification display"""
+        if not notification_msg:
+            notification_msg = f"📥 File '{download_name}' has finished downloading!"
+            
+        self.show_status(f"✅ Download Complete: {download_name}", "success", 5000)
+
+        # Play sound if enabled
+        if self.notification_sound_enabled.get():
+            sound_thread = threading.Thread(target=self._play_alarm_sound, daemon=True)
+            sound_thread.start()
+
+        # Show popup if enabled
+        if self.notification_popup_enabled.get():
+            # Create custom notification dialog
+            self.show_custom_notification(download_name, notification_msg)
+
+    def show_custom_notification(self, title, message):
+        """Show a custom styled notification dialog"""
+        dialog = tk.Toplevel(self.master)
+        dialog.title("Download Complete")
+        dialog.geometry("400x200")
+        dialog.resizable(False, False)
+        dialog.transient(self.master)
+        dialog.grab_set()
+        
+        # Center the dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (400 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (200 // 2)
+        dialog.geometry(f"400x200+{x}+{y}")
+        
+        # Apply theme
+        theme = DARK_THEME if self.current_theme == "dark" else LIGHT_THEME
+        dialog.config(bg=theme["bg"])
+        
+        # Content frame
+        content = tk.Frame(dialog, bg=theme["bg"], padx=20, pady=20)
+        content.pack(fill="both", expand=True)
+        
+        # Icon and title
+        header = tk.Frame(content, bg=theme["bg"])
+        header.pack(fill="x", pady=(0, 15))
+        
+        icon_label = tk.Label(header, text="📥", font=("Segoe UI", 24), bg=theme["bg"], fg=theme["fg"])
+        icon_label.pack(side="left")
+        
+        title_label = tk.Label(header, text="Download Complete!", 
+                              font=("Segoe UI", 14, "bold"), bg=theme["bg"], fg=theme["accent"])
+        title_label.pack(side="left", padx=(10, 0))
+        
+        # Message
+        msg_label = tk.Label(content, text=message, font=("Segoe UI", 10), 
+                            bg=theme["bg"], fg=theme["fg"], justify="left", wraplength=350)
+        msg_label.pack(fill="x", pady=(0, 15))
+        
+        # Buttons
+        button_frame = tk.Frame(content, bg=theme["bg"])
+        button_frame.pack(fill="x")
+        
+        ok_button = tk.Button(button_frame, text="OK", command=dialog.destroy,
+                             font=("Segoe UI", 10, "bold"), bg=theme["accent"], fg="white",
+                             relief="flat", padx=20, pady=8)
+        ok_button.pack(side="right")
+        
+        # Auto-close after 10 seconds
+        dialog.after(10000, dialog.destroy)
+
+    def show_about(self):
+        """Enhanced about dialog"""
+        dialog = tk.Toplevel(self.master)
+        dialog.title("About Download Notifier Pro")
+        dialog.geometry("500x400")
+        dialog.resizable(False, False)
+        dialog.transient(self.master)
+        dialog.grab_set()
+        
+        # Center dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (500 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (400 // 2)
+        dialog.geometry(f"500x400+{x}+{y}")
+        
+        # Apply theme
+        theme = DARK_THEME if self.current_theme == "dark" else LIGHT_THEME
+        dialog.config(bg=theme["bg"])
+        
+        # Content
+        content = tk.Frame(dialog, bg=theme["bg"], padx=30, pady=30)
+        content.pack(fill="both", expand=True)
+        
+        # App icon and title
+        title_frame = tk.Frame(content, bg=theme["bg"])
+        title_frame.pack(fill="x", pady=(0, 20))
+        
+        icon = tk.Label(title_frame, text="📥", font=("Segoe UI", 32), bg=theme["bg"])
+        icon.pack()
+        
+        title = tk.Label(title_frame, text="Download Notifier Pro", 
+                        font=("Segoe UI", 18, "bold"), bg=theme["bg"], fg=theme["accent"])
+        title.pack()
+        
+        version = tk.Label(title_frame, text=f"Version {APP_VERSION}", 
+                          font=("Segoe UI", 12), bg=theme["bg"], fg=theme["fg"])
+        version.pack()
+        
+        # Description
+        desc_text = """
+An intelligent download monitoring application that watches specified 
+directories and notifies you when downloads are complete.
+
+Features:
+• Smart download detection with size-aware algorithms
+• Multiple directory monitoring with recursive support
+• Customizable notifications (sound + popup)
+• Real-time activity logging and statistics
+• Modern dark/light theme support
+• Export capabilities for logs and statistics
+• Enhanced temporary file filtering
+• Processing timeout protection
+
+Created by: Sandaru Gunathilake
+Enhanced by: AI Assistant
+
+This software is open source and free to use.
+        """
+        
+        desc = tk.Label(content, text=desc_text.strip(), font=("Segoe UI", 10),
+                       bg=theme["bg"], fg=theme["fg"], justify="left")
+        desc.pack(fill="x", pady=20)
+        
+        # Buttons
+        button_frame = tk.Frame(content, bg=theme["bg"])
+        button_frame.pack(fill="x", pady=(20, 0))
+        
+        github_button = tk.Button(button_frame, text="🌐 GitHub", 
+                                 command=lambda: webbrowser.open("https://github.com/RensithUdara/Download-Notifer-App"),
+                                 font=("Segoe UI", 10), bg=theme["info"], fg="white",
+                                 relief="flat", padx=15, pady=6)
+        github_button.pack(side="left")
+        
+        close_button = tk.Button(button_frame, text="Close", command=dialog.destroy,
+                                font=("Segoe UI", 10, "bold"), bg=theme["secondary_bg"], fg=theme["fg"],
+                                relief="flat", padx=20, pady=6)
+        close_button.pack(side="right")
+
+    def stop_alarm(self):
+        """Enhanced alarm stopping"""
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.stop()
+            self.stop_alarm_button.config(state="disabled")
+            self.show_status("Alarm stopped", "info", 2000)
+            self.log_message("Alarm manually stopped", "info")
+        else:
+            self.show_status("No alarm is currently playing", "warning", 2000)
+
+    def _play_alarm_sound(self):
+        """Enhanced alarm sound playback"""
+        if not self.notification_sound_enabled.get():
+            return
+            
+        try:
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+
+            if os.path.exists(ALARM_SOUND_FILE):
+                pygame.mixer.music.load(ALARM_SOUND_FILE)
+                pygame.mixer.music.play()
+                
+                # Enable stop button
+                self.master.after(0, lambda: self.stop_alarm_button.config(state="normal"))
+                
+                # Wait for sound to finish
+                while pygame.mixer.music.get_busy():
+                    time.sleep(0.1)
+                    
+                # Disable stop button
+                self.master.after(0, lambda: self.stop_alarm_button.config(state="disabled"))
+            else:
+                self.log_message(f"Alarm sound file not found: {ALARM_SOUND_FILE}", "error")
+                
+        except pygame.error as e:
+            self.log_message(f"Audio playback error: {e}", "error")
+        except Exception as e:
+            self.log_message(f"Unexpected sound error: {e}", "error")
+
+    def on_closing(self):
+        """Enhanced graceful shutdown"""
+        if self.is_monitoring:
+            if messagebox.askyesno("Exit", "Monitoring is active. Stop monitoring and exit?"):
+                self.stop_monitoring()
+            else:
+                return
+        
+        # Save settings before closing
+        self.save_settings()
+        
+        # Stop any playing sounds
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.stop()
+        if pygame.mixer.get_init():
+            pygame.mixer.quit()
+            
+        self.master.destroy()
+
     def _apply_theme(self, theme_colors):
         """Applies the specified theme colors to the widgets."""
         # The root window (self.master) only supports 'bg' for background
@@ -1505,28 +2110,65 @@ class DownloadNotifierApp:
 
 # --- Main Execution ---
 if __name__ == "__main__":
-    # Initialize Pygame mixer (must be done before loading any sounds)
+    # Initialize Pygame mixer
     try:
         pygame.init()
         pygame.mixer.init()
     except Exception as e:
-        print(f"Could not initialize Pygame mixer: {e}. Ensure necessary audio drivers are installed.")
-        # Exit if mixer cannot be initialized, as sound won't work
-        # This is a critical failure, so a hard exit is appropriate.
-        exit()
+        print(f"Could not initialize Pygame mixer: {e}")
+        print("Sound notifications will not be available.")
 
-    # Create a dummy alarm sound file if it doesn't exist for testing
+    # Create alarm sound file if it doesn't exist
     if not os.path.exists(ALARM_SOUND_FILE):
         try:
-            # Note: Creating a dummy MP3 or WAV from scratch is complex.
-            # This will just create an empty file. You MUST replace this
-            # with an actual sound file for the alarm to work.
-            with open(ALARM_SOUND_FILE, 'wb') as f:
-                f.write(b'') # Create an empty file
-            print(f"Created an empty dummy file '{ALARM_SOUND_FILE}'. Please replace it with a real .wav or .mp3 sound file.")
+            # Generate a simple beep sound
+            import wave
+            import struct
+            import math
+            
+            def generate_beep(frequency=800, duration=1.0, sample_rate=44100, amplitude=0.5):
+                frames = int(duration * sample_rate)
+                sound_data = []
+                
+                for i in range(frames):
+                    sample = amplitude * math.sin(2 * math.pi * frequency * i / sample_rate)
+                    sound_data.append(int(sample * 32767))
+                
+                return sound_data
+            
+            beep_data = generate_beep(frequency=800, duration=1.5)
+            
+            with wave.open(ALARM_SOUND_FILE, 'w') as wav_file:
+                wav_file.setnchannels(1)  # Mono
+                wav_file.setsampwidth(2)  # 2 bytes per sample
+                wav_file.setframerate(44100)
+                
+                for sample in beep_data:
+                    wav_file.writeframes(struct.pack('<h', sample))
+            
+            print(f"Generated {ALARM_SOUND_FILE} successfully!")
+            
         except Exception as e:
-            print(f"Could not create dummy alarm file: {e}. Please ensure '{ALARM_SOUND_FILE}' exists and is a .wav or .mp3 file.")
+            print(f"Could not create alarm sound file: {e}")
+            print("You may need to provide your own alarm.wav file.")
 
+    # Create and run the application
     root = tk.Tk()
+    
+    # Set application icon if available
+    try:
+        if sys.platform.startswith('win'):
+            root.wm_iconbitmap(default='alarm.ico')  # You can add an icon file
+    except:
+        pass  # Icon not available
+    
     app = DownloadNotifierApp(root)
-    root.mainloop()
+    
+    try:
+        root.mainloop()
+    except KeyboardInterrupt:
+        print("\nApplication interrupted by user")
+        app.on_closing()
+    except Exception as e:
+        print(f"Application error: {e}")
+        app.on_closing()
