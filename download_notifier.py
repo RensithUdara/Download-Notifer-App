@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
 import time
+import math
 import threading
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -35,43 +36,73 @@ WINDOW_MIN_WIDTH = 800
 WINDOW_MIN_HEIGHT = 600
 SETTINGS_FILE = "settings.json"
 
-# --- Enhanced Theme Configuration ---
+# --- Enhanced Creative Theme Configuration ---
+CREATIVE_THEMES = {
+    "ocean": {
+        "name": "Ocean Breeze",
+        "bg": "#0d1b2a", "fg": "#ffffff", "secondary_bg": "#1b263b",
+        "accent": "#00b4d8", "accent_hover": "#0096c7", "danger": "#e63946",
+        "danger_hover": "#d00000", "warning": "#f77f00", "info": "#00b4d8",
+        "success": "#06ffa5", "text_bg": "#1e3a5f", "text_fg": "#ffffff",
+        "entry_bg": "#233759", "entry_fg": "#ffffff", "border": "#457b9d",
+        "hover": "#2a4a6b", "gradient_start": "#0d1b2a", "gradient_end": "#1b263b"
+    },
+    "sunset": {
+        "name": "Sunset Glow",
+        "bg": "#2d1b69", "fg": "#ffffff", "secondary_bg": "#3c2777",
+        "accent": "#ff6b35", "accent_hover": "#e55a31", "danger": "#e63946",
+        "danger_hover": "#d00000", "warning": "#ffc300", "info": "#7209b7",
+        "success": "#06ffa5", "text_bg": "#4a2c85", "text_fg": "#ffffff",
+        "entry_bg": "#5d3493", "entry_fg": "#ffffff", "border": "#7f4fc9",
+        "hover": "#6a3ca1", "gradient_start": "#2d1b69", "gradient_end": "#ff6b35"
+    },
+    "forest": {
+        "name": "Forest Green",
+        "bg": "#1b2d1b", "fg": "#ffffff", "secondary_bg": "#2d4a2d",
+        "accent": "#52b788", "accent_hover": "#40916c", "danger": "#e63946",
+        "danger_hover": "#d00000", "warning": "#f77f00", "info": "#52b788",
+        "success": "#06ffa5", "text_bg": "#3d5a3d", "text_fg": "#ffffff",
+        "entry_bg": "#4a6b4a", "entry_fg": "#ffffff", "border": "#74c69d",
+        "hover": "#5a7c5a", "gradient_start": "#1b2d1b", "gradient_end": "#52b788"
+    },
+    "cyberpunk": {
+        "name": "Cyberpunk",
+        "bg": "#0a0a0a", "fg": "#00ff9f", "secondary_bg": "#1a1a1a",
+        "accent": "#ff0080", "accent_hover": "#e6006b", "danger": "#ff073a",
+        "danger_hover": "#e6003a", "warning": "#ffb700", "info": "#00b4ff",
+        "success": "#00ff9f", "text_bg": "#2a2a2a", "text_fg": "#00ff9f",
+        "entry_bg": "#3a3a3a", "entry_fg": "#00ff9f", "border": "#ff0080",
+        "hover": "#4a4a4a", "gradient_start": "#0a0a0a", "gradient_end": "#ff0080"
+    },
+    "candy": {
+        "name": "Candy Pop",
+        "bg": "#ffeaa7", "fg": "#2d3436", "secondary_bg": "#ffffff",
+        "accent": "#fd79a8", "accent_hover": "#e84393", "danger": "#e17055",
+        "danger_hover": "#d63031", "warning": "#fdcb6e", "info": "#74b9ff",
+        "success": "#00b894", "text_bg": "#ffffff", "text_fg": "#2d3436",
+        "entry_bg": "#ffffff", "entry_fg": "#2d3436", "border": "#fd79a8",
+        "hover": "#f8f9fa", "gradient_start": "#ffeaa7", "gradient_end": "#fd79a8"
+    }
+}
+
 DARK_THEME = {
-    "bg": "#2b2b2b",
-    "fg": "#ffffff",
-    "secondary_bg": "#3c3c3c",
-    "accent": "#4CAF50",
-    "accent_hover": "#45a049",
-    "danger": "#f44336",
-    "danger_hover": "#da190b",
-    "warning": "#ff9800",
-    "info": "#2196F3",
-    "success": "#4CAF50",
-    "text_bg": "#404040",
-    "text_fg": "#ffffff",
-    "entry_bg": "#505050",
-    "entry_fg": "#ffffff",
-    "border": "#555555",
-    "hover": "#4a4a4a"
+    "name": "Professional Dark",
+    "bg": "#2b2b2b", "fg": "#ffffff", "secondary_bg": "#3c3c3c",
+    "accent": "#4CAF50", "accent_hover": "#45a049", "danger": "#f44336",
+    "danger_hover": "#da190b", "warning": "#ff9800", "info": "#2196F3",
+    "success": "#4CAF50", "text_bg": "#404040", "text_fg": "#ffffff",
+    "entry_bg": "#505050", "entry_fg": "#ffffff", "border": "#555555",
+    "hover": "#4a4a4a", "gradient_start": "#2b2b2b", "gradient_end": "#3c3c3c"
 }
 
 LIGHT_THEME = {
-    "bg": "#f5f5f5",
-    "fg": "#333333",
-    "secondary_bg": "#ffffff",
-    "accent": "#4CAF50",
-    "accent_hover": "#45a049",
-    "danger": "#f44336",
-    "danger_hover": "#da190b",
-    "warning": "#ff9800",
-    "info": "#2196F3",
-    "success": "#4CAF50",
-    "text_bg": "#ffffff",
-    "text_fg": "#333333",
-    "entry_bg": "#ffffff",
-    "entry_fg": "#333333",
-    "border": "#cccccc",
-    "hover": "#e0e0e0"
+    "name": "Professional Light", 
+    "bg": "#f5f5f5", "fg": "#333333", "secondary_bg": "#ffffff",
+    "accent": "#4CAF50", "accent_hover": "#45a049", "danger": "#f44336",
+    "danger_hover": "#da190b", "warning": "#ff9800", "info": "#2196F3",
+    "success": "#4CAF50", "text_bg": "#ffffff", "text_fg": "#333333",
+    "entry_bg": "#ffffff", "entry_fg": "#333333", "border": "#cccccc",
+    "hover": "#e0e0e0", "gradient_start": "#f5f5f5", "gradient_end": "#ffffff"
 }
 
 # --- Enhanced File System Event Handler with Size Checking ---
@@ -550,13 +581,47 @@ class DownloadNotifierApp:
         }
         
         # Settings
-        self.current_theme = "light"
+        self.default_settings = {
+            "sound_enabled": True,
+            "popup_enabled": True,
+            "min_file_size": MIN_FILE_SIZE_MB,
+            "auto_clear_log": False,
+            "show_file_details": True,
+            "current_theme": "dark",
+            "window_width": 950,
+            "window_height": 700,
+            "always_on_top": False,
+            "start_minimized": False,
+            "auto_start_monitoring": False,
+            "notification_duration": 5,
+            "max_recent_downloads": 50,
+            "enable_statistics": True,
+            "enable_gradient": True,
+            "animation_speed": "normal",
+            "enable_sound_effects": True,
+            "enable_particle_effects": False,
+            "enable_notifications_history": True,
+            "auto_backup_settings": True,
+            "enable_dark_mode_schedule": False,
+            "dark_mode_start": "20:00",
+            "dark_mode_end": "06:00"
+        }
+        self.current_theme = self.default_settings["current_theme"]
         self.settings = self.load_settings()
         self.notification_sound_enabled = tk.BooleanVar(value=self.settings.get("sound_enabled", True))
         self.notification_popup_enabled = tk.BooleanVar(value=self.settings.get("popup_enabled", True))
         self.min_file_size = tk.DoubleVar(value=self.settings.get("min_file_size", MIN_FILE_SIZE_MB))
         self.auto_clear_log = tk.BooleanVar(value=self.settings.get("auto_clear_log", False))
         self.show_file_details = tk.BooleanVar(value=self.settings.get("show_file_details", True))
+        
+        # New creative features
+        self.enable_gradient = tk.BooleanVar(value=self.settings.get("enable_gradient", True))
+        self.animation_speed = tk.StringVar(value=self.settings.get("animation_speed", "normal"))
+        self.enable_sound_effects = tk.BooleanVar(value=self.settings.get("enable_sound_effects", True))
+        self.always_on_top = tk.BooleanVar(value=self.settings.get("always_on_top", False))
+        
+        # Notifications history
+        self.notifications_history = []
         
         # Initialize Pygame mixer
         if not pygame.mixer.get_init():
@@ -687,16 +752,46 @@ class DownloadNotifierApp:
                                      font=("Segoe UI", 9))
         self.version_label.pack(anchor="w")
         
-        # Right side - Theme toggle and monitoring status
+        # Right side - Enhanced controls with creative themes
         controls_frame = tk.Frame(header_frame)
         controls_frame.pack(side="right", fill="y")
         
-        # Theme toggle button
-        self.theme_button = tk.Button(controls_frame, text="🌙 Dark",
-                                     command=self.toggle_theme,
-                                     font=("Segoe UI", 9),
-                                     relief="flat", bd=1, padx=15, pady=5)
-        self.theme_button.pack(side="top", anchor="e", pady=(0, 5))
+        # Creative theme selector
+        theme_frame = tk.Frame(controls_frame)
+        theme_frame.pack(side="top", anchor="e", pady=(0, 5))
+        
+        tk.Label(theme_frame, text="🎨", font=("Segoe UI", 12)).pack(side="left")
+        
+        themes_list = ["dark", "light", "ocean", "sunset", "forest", "cyberpunk", "candy"]
+        self.theme_var = tk.StringVar(value=self.current_theme)
+        self.theme_dropdown = ttk.Combobox(theme_frame, 
+                                         textvariable=self.theme_var,
+                                         values=themes_list,
+                                         state="readonly",
+                                         width=10,
+                                         font=("Segoe UI", 9))
+        self.theme_dropdown.pack(side="left", padx=5)
+        self.theme_dropdown.bind("<<ComboboxSelected>>", self.on_theme_change)
+        
+        # Quick settings frame
+        quick_frame = tk.Frame(controls_frame)
+        quick_frame.pack(side="top", anchor="e", pady=(0, 5))
+        
+        # Always on top toggle
+        self.top_btn = tk.Checkbutton(quick_frame,
+                                    text="📌 Top",
+                                    variable=self.always_on_top,
+                                    command=self.toggle_always_on_top,
+                                    font=("Segoe UI", 8))
+        self.top_btn.pack(side="left", padx=2)
+        
+        # Gradient toggle
+        self.gradient_btn = tk.Checkbutton(quick_frame,
+                                         text="🌈 FX",
+                                         variable=self.enable_gradient,
+                                         command=self.toggle_gradient_effects,
+                                         font=("Segoe UI", 8))
+        self.gradient_btn.pack(side="left", padx=2)
         
         # Monitoring status indicator
         self.status_indicator = tk.Label(controls_frame, text="● Stopped",
@@ -718,8 +813,11 @@ class DownloadNotifierApp:
         # Tab 3: Statistics
         self.create_statistics_tab()
         
-        # Tab 4: Settings
-        self.create_settings_tab()
+        # Tab 5: Creative Dashboard
+        self.create_dashboard_tab()
+        
+        # Tab 6: Notifications History  
+        self.create_notifications_tab()
     
     def create_monitor_tab(self):
         """Create the main monitoring tab"""
@@ -751,25 +849,46 @@ class DownloadNotifierApp:
                                       padx=15, pady=8)
         self.browse_button.pack(side="right")
         
-        # Quick path buttons
+        # Enhanced Quick path buttons with more creative options
         quick_paths_frame = tk.Frame(dir_section)
         quick_paths_frame.pack(fill="x", pady=(10, 0))
         
-        tk.Label(quick_paths_frame, text="Quick Add:",
-                font=("Segoe UI", 9)).pack(side="left", padx=(0, 10))
+        tk.Label(quick_paths_frame, text="✨ Quick Paths:",
+                font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 5))
         
-        quick_paths = [
-            ("Downloads", os.path.join(os.path.expanduser("~"), "Downloads")),
-            ("Desktop", os.path.join(os.path.expanduser("~"), "Desktop")),
-            ("Documents", os.path.join(os.path.expanduser("~"), "Documents"))
+        # First row of buttons
+        row1_frame = tk.Frame(quick_paths_frame)
+        row1_frame.pack(fill="x", pady=2)
+        
+        quick_paths_row1 = [
+            ("📥 Downloads", os.path.join(os.path.expanduser("~"), "Downloads")),
+            ("🖥️ Desktop", os.path.join(os.path.expanduser("~"), "Desktop")),
+            ("📄 Documents", os.path.join(os.path.expanduser("~"), "Documents"))
         ]
         
-        for name, path in quick_paths:
-            btn = tk.Button(quick_paths_frame, text=name,
+        for name, path in quick_paths_row1:
+            btn = tk.Button(row1_frame, text=name,
                            command=lambda p=path: self.add_quick_path(p),
-                           font=("Segoe UI", 8), relief="flat", bd=1,
-                           padx=8, pady=2)
-            btn.pack(side="left", padx=(0, 5))
+                           font=("Segoe UI", 9), relief="raised", bd=2,
+                           padx=12, pady=4)
+            btn.pack(side="left", padx=3, expand=True, fill="x")
+        
+        # Second row of buttons  
+        row2_frame = tk.Frame(quick_paths_frame)
+        row2_frame.pack(fill="x", pady=2)
+        
+        quick_paths_row2 = [
+            ("🎵 Music", os.path.join(os.path.expanduser("~"), "Music")),
+            ("🎬 Videos", os.path.join(os.path.expanduser("~"), "Videos")),
+            ("🖼️ Pictures", os.path.join(os.path.expanduser("~"), "Pictures"))
+        ]
+        
+        for name, path in quick_paths_row2:
+            btn = tk.Button(row2_frame, text=name,
+                           command=lambda p=path: self.add_quick_path(p),
+                           font=("Segoe UI", 9), relief="raised", bd=2,
+                           padx=12, pady=4)
+            btn.pack(side="left", padx=3, expand=True, fill="x")
         
         # Control buttons section
         control_section = tk.LabelFrame(monitor_frame, text="🎮 Control Panel",
@@ -2107,6 +2226,408 @@ This software is open source and free to use.
         # not explicitly initialized. Let's stick to the mixer for now as that's all we use.
         # pygame.quit()
         self.master.destroy()
+
+    # --- Creative Enhancement Methods ---
+    
+    def create_dashboard_tab(self):
+        """Create an advanced dashboard with visual analytics"""
+        dashboard_frame = tk.Frame(self.notebook)
+        self.notebook.add(dashboard_frame, text="📊 Dashboard")
+        
+        # Create scrollable canvas for dashboard
+        canvas = tk.Canvas(dashboard_frame)
+        scrollbar = ttk.Scrollbar(dashboard_frame, orient="vertical", command=canvas.yview)
+        scrollable_dashboard = tk.Frame(canvas)
+        
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        canvas.create_window((0, 0), window=scrollable_dashboard, anchor="nw")
+        
+        # Real-time monitoring section
+        monitoring_frame = tk.LabelFrame(scrollable_dashboard, text="🔴 Live Monitoring",
+                                       font=("Segoe UI", 12, "bold"), padx=15, pady=10)
+        monitoring_frame.pack(fill="x", padx=15, pady=10)
+        
+        # Current activity indicator
+        self.activity_canvas = tk.Canvas(monitoring_frame, height=100)
+        self.activity_canvas.pack(fill="x", pady=10)
+        
+        # System performance metrics
+        performance_frame = tk.LabelFrame(scrollable_dashboard, text="⚡ Performance",
+                                        font=("Segoe UI", 12, "bold"), padx=15, pady=10)
+        performance_frame.pack(fill="x", padx=15, pady=10)
+        
+        metrics_grid = tk.Frame(performance_frame)
+        metrics_grid.pack(fill="x", pady=5)
+        
+        # CPU and Memory usage (simulated)
+        self.create_metric_widget(metrics_grid, "CPU", "💻", 0, 0)
+        self.create_metric_widget(metrics_grid, "Memory", "🧠", 0, 1)
+        self.create_metric_widget(metrics_grid, "Disk I/O", "💾", 1, 0)
+        self.create_metric_widget(metrics_grid, "Network", "🌐", 1, 1)
+        
+        # Update scrollregion
+        scrollable_dashboard.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    def create_metric_widget(self, parent, name, icon, row, col):
+        """Create a metric display widget"""
+        metric_frame = tk.Frame(parent, relief="raised", bd=2)
+        metric_frame.grid(row=row, column=col, padx=10, pady=5, sticky="ew")
+        parent.grid_columnconfigure(col, weight=1)
+        
+        tk.Label(metric_frame, text=f"{icon} {name}", 
+                font=("Segoe UI", 10, "bold")).pack()
+        
+        # Progress bar for metric
+        progress = ttk.Progressbar(metric_frame, length=100, mode="determinate")
+        progress.pack(pady=5)
+        
+        # Value label
+        value_label = tk.Label(metric_frame, text="0%", font=("Segoe UI", 9))
+        value_label.pack()
+        
+        # Store reference for updates
+        setattr(self, f"metric_{name.lower().replace(' ', '_')}", (progress, value_label))
+
+    def create_notifications_tab(self):
+        """Create notifications history tab"""
+        notifications_frame = tk.Frame(self.notebook)
+        self.notebook.add(notifications_frame, text="🔔 Notifications")
+        
+        # Header with controls
+        header_frame = tk.Frame(notifications_frame)
+        header_frame.pack(fill="x", padx=15, pady=10)
+        
+        tk.Label(header_frame, text="📜 Notifications History", 
+                font=("Segoe UI", 14, "bold")).pack(side="left")
+        
+        # Clear history button
+        tk.Button(header_frame, text="🗑️ Clear", 
+                 command=self.clear_notifications_history,
+                 font=("Segoe UI", 9)).pack(side="right")
+        
+        # Notifications listbox with enhanced styling
+        list_frame = tk.Frame(notifications_frame)
+        list_frame.pack(fill="both", expand=True, padx=15, pady=(0, 15))
+        
+        # Listbox with scrollbar
+        scrollbar_notif = tk.Scrollbar(list_frame)
+        scrollbar_notif.pack(side="right", fill="y")
+        
+        self.notifications_listbox = tk.Listbox(list_frame, 
+                                              yscrollcommand=scrollbar_notif.set,
+                                              font=("Consolas", 10),
+                                              height=20)
+        self.notifications_listbox.pack(side="left", fill="both", expand=True)
+        scrollbar_notif.config(command=self.notifications_listbox.yview)
+        
+        # Sample notifications for demo
+        self.add_sample_notifications()
+
+    def add_sample_notifications(self):
+        """Add sample notifications for demo"""
+        sample_notifications = [
+            "🎉 Welcome to Download Notifier Pro!",
+            "📁 Monitoring started for Downloads folder",
+            "⚙️ Settings saved successfully",
+            "🎨 Theme changed to Ocean Breeze"
+        ]
+        
+        for notification in sample_notifications:
+            timestamp = time.strftime("%H:%M:%S")
+            self.notifications_listbox.insert(0, f"[{timestamp}] {notification}")
+
+    def on_theme_change(self, event=None):
+        """Handle theme change from dropdown"""
+        new_theme = self.theme_var.get()
+        self.current_theme = new_theme
+        self.apply_enhanced_theme()
+        self.save_settings()
+
+    def apply_enhanced_theme(self):
+        """Apply enhanced themes including creative ones"""
+        if self.current_theme in CREATIVE_THEMES:
+            theme = CREATIVE_THEMES[self.current_theme]
+        elif self.current_theme == "dark":
+            theme = DARK_THEME
+        else:
+            theme = LIGHT_THEME
+        
+        # Apply theme to main window
+        self.master.configure(bg=theme["bg"])
+        
+        # Apply to all frames and widgets recursively
+        self.apply_theme_to_widget(self.master, theme)
+        
+        # Update status indicator
+        if hasattr(self, 'status_indicator'):
+            if self.is_monitoring:
+                self.status_indicator.configure(fg=theme["success"])
+            else:
+                self.status_indicator.configure(fg=theme["danger"])
+        
+        # Apply gradient effects if enabled
+        if self.enable_gradient.get() and "gradient_start" in theme:
+            self.apply_gradient_effects(theme)
+
+    def apply_theme_to_widget(self, widget, theme):
+        """Recursively apply theme to widget and children"""
+        try:
+            widget_class = widget.winfo_class()
+            
+            if widget_class in ['Frame', 'Toplevel']:
+                widget.configure(bg=theme["bg"])
+            elif widget_class == 'Label':
+                widget.configure(bg=theme["bg"], fg=theme["fg"])
+            elif widget_class == 'Button':
+                widget.configure(bg=theme["accent"], fg=theme["bg"],
+                               activebackground=theme["accent_hover"])
+            elif widget_class == 'Entry':
+                widget.configure(bg=theme["entry_bg"], fg=theme["entry_fg"],
+                               insertbackground=theme["fg"])
+            elif widget_class == 'Text':
+                widget.configure(bg=theme["text_bg"], fg=theme["text_fg"],
+                               insertbackground=theme["fg"])
+            elif widget_class == 'Listbox':
+                widget.configure(bg=theme["text_bg"], fg=theme["text_fg"],
+                               selectbackground=theme["accent"])
+        except:
+            pass  # Skip widgets that don't support these options
+        
+        # Apply to children
+        for child in widget.winfo_children():
+            self.apply_theme_to_widget(child, theme)
+
+    def apply_gradient_effects(self, theme):
+        """Apply gradient background effects"""
+        if hasattr(self, 'activity_canvas'):
+            # Create gradient effect on activity canvas
+            self.activity_canvas.delete("gradient")
+            
+            width = self.activity_canvas.winfo_width()
+            height = self.activity_canvas.winfo_height()
+            
+            if width > 1 and height > 1:
+                # Create gradient rectangles
+                for i in range(height):
+                    ratio = i / height
+                    # Simple gradient from start to end color
+                    color = self.interpolate_color(theme["gradient_start"], 
+                                                 theme["gradient_end"], ratio)
+                    self.activity_canvas.create_rectangle(0, i, width, i+1, 
+                                                        outline=color, fill=color,
+                                                        tags="gradient")
+
+    def interpolate_color(self, color1, color2, ratio):
+        """Interpolate between two hex colors"""
+        try:
+            # Convert hex to RGB
+            r1, g1, b1 = int(color1[1:3], 16), int(color1[3:5], 16), int(color1[5:7], 16)
+            r2, g2, b2 = int(color2[1:3], 16), int(color2[3:5], 16), int(color2[5:7], 16)
+            
+            # Interpolate
+            r = int(r1 + (r2 - r1) * ratio)
+            g = int(g1 + (g2 - g1) * ratio)
+            b = int(b1 + (b2 - b1) * ratio)
+            
+            return f"#{r:02x}{g:02x}{b:02x}"
+        except:
+            return color1
+
+    def toggle_always_on_top(self):
+        """Toggle always on top functionality"""
+        self.master.attributes('-topmost', self.always_on_top.get())
+        self.save_settings()
+
+    def toggle_gradient_effects(self):
+        """Toggle gradient effects"""
+        if self.enable_gradient.get():
+            self.apply_enhanced_theme()
+        else:
+            # Disable gradients by applying normal theme
+            self.apply_enhanced_theme()
+        self.save_settings()
+
+    def minimize_to_tray(self):
+        """Minimize to system tray (placeholder)"""
+        self.master.iconify()
+        self.update_status("Minimized to taskbar")
+
+    def toggle_fullscreen(self):
+        """Toggle fullscreen mode"""
+        current_state = self.master.attributes('-fullscreen')
+        self.master.attributes('-fullscreen', not current_state)
+
+    def clear_notifications_history(self):
+        """Clear notifications history"""
+        if hasattr(self, 'notifications_listbox'):
+            self.notifications_listbox.delete(0, tk.END)
+        self.notifications_history.clear()
+
+    def start_background_animations(self):
+        """Start background animations if enabled"""
+        if self.enable_gradient.get():
+            self.animate_activity_indicator()
+
+    def animate_activity_indicator(self):
+        """Animate the activity indicator"""
+        if hasattr(self, 'activity_canvas') and self.enable_gradient.get():
+            # Simple pulsing animation
+            current_time = time.time()
+            pulse = (math.sin(current_time * 2) + 1) * 0.5  # 0 to 1
+            
+            # Update canvas with pulse effect
+            try:
+                if self.is_monitoring:
+                    self.activity_canvas.delete("pulse")
+                    width = self.activity_canvas.winfo_width()
+                    height = self.activity_canvas.winfo_height()
+                    
+                    if width > 1 and height > 1:
+                        # Create pulsing circle
+                        center_x, center_y = width // 2, height // 2
+                        radius = int(20 + pulse * 10)
+                        
+                        self.activity_canvas.create_oval(
+                            center_x - radius, center_y - radius,
+                            center_x + radius, center_y + radius,
+                            fill=f"#{int(255 * pulse):02x}ff{int(255 * (1-pulse)):02x}",
+                            tags="pulse"
+                        )
+            except:
+                pass
+            
+            # Schedule next animation frame
+            self.master.after(100, self.animate_activity_indicator)
+
+    def setup_keyboard_shortcuts(self):
+        """Setup enhanced keyboard shortcuts"""
+        self.master.bind('<Control-s>', lambda e: self.save_settings())
+        self.master.bind('<F5>', lambda e: self.refresh_statistics())
+        self.master.bind('<Escape>', lambda e: self.master.iconify())
+        self.master.bind('<F11>', lambda e: self.toggle_fullscreen())
+        self.master.bind('<Control-t>', lambda e: self.cycle_themes())
+        self.master.bind('<Control-g>', lambda e: self.toggle_gradient_effects())
+
+    def cycle_themes(self):
+        """Cycle through available themes"""
+        themes_list = ["dark", "light"] + list(CREATIVE_THEMES.keys())
+        current_index = themes_list.index(self.current_theme)
+        next_index = (current_index + 1) % len(themes_list)
+        
+        self.theme_var.set(themes_list[next_index])
+        self.on_theme_change()
+
+    def show_enhanced_notification(self, title, message, notification_type="info"):
+        """Show enhanced notification with animation"""
+        if self.notification_popup_enabled.get():
+            # Create notification window
+            notif_window = tk.Toplevel(self.master)
+            notif_window.title(title)
+            notif_window.geometry("350x150")
+            notif_window.resizable(False, False)
+            
+            # Center on screen
+            x = (notif_window.winfo_screenwidth() // 2) - 175
+            y = 50
+            notif_window.geometry(f"350x150+{x}+{y}")
+            
+            # Make it always on top
+            notif_window.attributes('-topmost', True)
+            
+            # Get current theme
+            if self.current_theme in CREATIVE_THEMES:
+                theme = CREATIVE_THEMES[self.current_theme]
+            elif self.current_theme == "dark":
+                theme = DARK_THEME
+            else:
+                theme = LIGHT_THEME
+            
+            # Style notification
+            notif_window.configure(bg=theme["bg"])
+            
+            # Icon and title
+            header_frame = tk.Frame(notif_window, bg=theme["bg"])
+            header_frame.pack(fill="x", padx=10, pady=10)
+            
+            icons = {"info": "ℹ️", "success": "✅", "warning": "⚠️", "error": "❌"}
+            icon = icons.get(notification_type, "ℹ️")
+            
+            tk.Label(header_frame, text=f"{icon} {title}", 
+                    font=("Segoe UI", 12, "bold"),
+                    bg=theme["bg"], fg=theme["fg"]).pack()
+            
+            # Message
+            tk.Label(notif_window, text=message, 
+                    font=("Segoe UI", 10),
+                    bg=theme["bg"], fg=theme["fg"],
+                    wraplength=300, justify="center").pack(pady=10)
+            
+            # Close button
+            tk.Button(notif_window, text="Close", 
+                     command=notif_window.destroy,
+                     bg=theme["accent"], fg=theme["bg"],
+                     font=("Segoe UI", 9)).pack(pady=5)
+            
+            # Auto-close after 5 seconds
+            notif_window.after(5000, notif_window.destroy)
+            
+            # Add to history
+            timestamp = time.strftime("%H:%M:%S")
+            self.notifications_history.append(f"[{timestamp}] {title}: {message}")
+            
+            if hasattr(self, 'notifications_listbox'):
+                self.notifications_listbox.insert(0, f"[{timestamp}] {title}: {message}")
+
+    def load_settings(self):
+        """Load enhanced settings"""
+        try:
+            with open(SETTINGS_FILE, 'r') as f:
+                saved_settings = json.load(f)
+            
+            # Merge with defaults
+            settings = self.default_settings.copy()
+            settings.update(saved_settings)
+            return settings
+        except:
+            return self.default_settings.copy()
+
+    def save_settings(self):
+        """Save enhanced settings"""
+        try:
+            settings = {
+                "sound_enabled": self.notification_sound_enabled.get(),
+                "popup_enabled": self.notification_popup_enabled.get(),
+                "min_file_size": self.min_file_size.get(),
+                "auto_clear_log": self.auto_clear_log.get(),
+                "show_file_details": self.show_file_details.get(),
+                "current_theme": self.current_theme,
+                "window_width": self.master.winfo_width(),
+                "window_height": self.master.winfo_height(),
+                "always_on_top": self.always_on_top.get(),
+                "enable_gradient": self.enable_gradient.get(),
+                "animation_speed": self.animation_speed.get(),
+                "enable_sound_effects": self.enable_sound_effects.get()
+            }
+            
+            with open(SETTINGS_FILE, 'w') as f:
+                json.dump(settings, f, indent=2)
+            
+            self.update_status("Settings saved successfully! ✅")
+            
+        except Exception as e:
+            self.update_status(f"Error saving settings: {e}")
+
+    def update_enhanced_status(self, message, status_type="info"):
+        """Update status with enhanced styling"""
+        if hasattr(self, 'status_label'):
+            self.status_label.configure(text=message)
+        
+        # Show temporary notification
+        self.show_enhanced_notification("Status Update", message, status_type)
 
 # --- Main Execution ---
 if __name__ == "__main__":
