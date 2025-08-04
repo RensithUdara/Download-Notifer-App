@@ -2110,28 +2110,65 @@ This software is open source and free to use.
 
 # --- Main Execution ---
 if __name__ == "__main__":
-    # Initialize Pygame mixer (must be done before loading any sounds)
+    # Initialize Pygame mixer
     try:
         pygame.init()
         pygame.mixer.init()
     except Exception as e:
-        print(f"Could not initialize Pygame mixer: {e}. Ensure necessary audio drivers are installed.")
-        # Exit if mixer cannot be initialized, as sound won't work
-        # This is a critical failure, so a hard exit is appropriate.
-        exit()
+        print(f"Could not initialize Pygame mixer: {e}")
+        print("Sound notifications will not be available.")
 
-    # Create a dummy alarm sound file if it doesn't exist for testing
+    # Create alarm sound file if it doesn't exist
     if not os.path.exists(ALARM_SOUND_FILE):
         try:
-            # Note: Creating a dummy MP3 or WAV from scratch is complex.
-            # This will just create an empty file. You MUST replace this
-            # with an actual sound file for the alarm to work.
-            with open(ALARM_SOUND_FILE, 'wb') as f:
-                f.write(b'') # Create an empty file
-            print(f"Created an empty dummy file '{ALARM_SOUND_FILE}'. Please replace it with a real .wav or .mp3 sound file.")
+            # Generate a simple beep sound
+            import wave
+            import struct
+            import math
+            
+            def generate_beep(frequency=800, duration=1.0, sample_rate=44100, amplitude=0.5):
+                frames = int(duration * sample_rate)
+                sound_data = []
+                
+                for i in range(frames):
+                    sample = amplitude * math.sin(2 * math.pi * frequency * i / sample_rate)
+                    sound_data.append(int(sample * 32767))
+                
+                return sound_data
+            
+            beep_data = generate_beep(frequency=800, duration=1.5)
+            
+            with wave.open(ALARM_SOUND_FILE, 'w') as wav_file:
+                wav_file.setnchannels(1)  # Mono
+                wav_file.setsampwidth(2)  # 2 bytes per sample
+                wav_file.setframerate(44100)
+                
+                for sample in beep_data:
+                    wav_file.writeframes(struct.pack('<h', sample))
+            
+            print(f"Generated {ALARM_SOUND_FILE} successfully!")
+            
         except Exception as e:
-            print(f"Could not create dummy alarm file: {e}. Please ensure '{ALARM_SOUND_FILE}' exists and is a .wav or .mp3 file.")
+            print(f"Could not create alarm sound file: {e}")
+            print("You may need to provide your own alarm.wav file.")
 
+    # Create and run the application
     root = tk.Tk()
+    
+    # Set application icon if available
+    try:
+        if sys.platform.startswith('win'):
+            root.wm_iconbitmap(default='alarm.ico')  # You can add an icon file
+    except:
+        pass  # Icon not available
+    
     app = DownloadNotifierApp(root)
-    root.mainloop()
+    
+    try:
+        root.mainloop()
+    except KeyboardInterrupt:
+        print("\nApplication interrupted by user")
+        app.on_closing()
+    except Exception as e:
+        print(f"Application error: {e}")
+        app.on_closing()
