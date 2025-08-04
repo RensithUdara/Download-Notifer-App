@@ -325,6 +325,15 @@ class SizeAwareDownloadHandler(FileSystemEventHandler):
         Attempts to detect expected size and updates GUI.
         """
         if not self._is_file_temporary(file_path):
+            # Check minimum file size threshold
+            try:
+                file_size = os.path.getsize(file_path)
+                if file_size < MIN_FILE_SIZE_MB * 1024 * 1024:  # Convert MB to bytes
+                    self.app._log_message(f"Skipped small file: {os.path.basename(file_path)} ({file_size:,} bytes)", "info")
+                    return
+            except (OSError, FileNotFoundError):
+                return
+                
             self.file_creation_times[file_path] = time.time()
             
             # Try to detect expected file size
@@ -373,6 +382,13 @@ class SizeAwareDownloadHandler(FileSystemEventHandler):
             
             if not os.path.exists(file_path):
                 self.app._log_message(f"File disappeared before processing: {os.path.basename(file_path)}", "info")
+                self._cleanup_file_data(file_path)
+                continue
+                
+            # Check if file has been processing too long
+            creation_time = self.file_creation_times.get(file_path, time.time())
+            if time.time() - creation_time > MAX_PROCESSING_TIME:
+                self.app._log_message(f"Processing timeout for: {os.path.basename(file_path)}", "info")
                 self._cleanup_file_data(file_path)
                 continue
                 
@@ -488,14 +504,18 @@ class SizeAwareDownloadHandler(FileSystemEventHandler):
 class DownloadNotifierApp:
     def __init__(self, master):
         self.master = master
-        master.title("Download Notifier")
-        master.geometry("600x450")
-        master.resizable(False, False)
+        master.title("Download Notifier - Enhanced v1.1")
+        master.geometry("700x500")
+        master.resizable(True, True)  # Make window resizable
+        master.minsize(600, 450)  # Set minimum size
 
         self.monitor_path = tk.StringVar(value=DEFAULT_DOWNLOAD_DIR)
         self.observers = [] # List to hold multiple Observer instances
         self.event_handler = None
         self.is_monitoring = False
+        self.notification_sound_enabled = tk.BooleanVar(value=True)
+        self.notification_popup_enabled = tk.BooleanVar(value=True)
+        self.min_file_size = tk.DoubleVar(value=MIN_FILE_SIZE_MB)
         
         # Initialize Pygame mixer here as well, in case it wasn't done in __main__
         if not pygame.mixer.get_init():
@@ -533,10 +553,48 @@ class DownloadNotifierApp:
         header_frame = tk.Frame(self.master, padx=15, pady=10)
         header_frame.pack(fill="x")
 
-        self.app_title_label = tk.Label(header_frame, text="Download Notifier", font=self.app_title_font)
+        self.app_title_label = tk.Label(header_frame, text="Download Notifier - Enhanced", font=self.app_title_font)
         self.app_title_label.pack(side="left", expand=True, anchor="w") # Align left
 
-        # Removed theme toggle button
+        # Settings frame
+        settings_frame = tk.LabelFrame(main_content_frame, text="Settings", font=self.default_font, padx=10, pady=5)
+        settings_frame.pack(fill="x", pady=(0, 10))
+
+        # Notification settings
+        notifications_frame = tk.Frame(settings_frame)
+        notifications_frame.pack(fill="x", pady=2)
+        
+        self.sound_checkbox = tk.Checkbutton(
+            notifications_frame, 
+            text="Enable sound notifications", 
+            variable=self.notification_sound_enabled,
+            font=self.default_font
+        )
+        self.sound_checkbox.pack(side="left", padx=(0, 20))
+        
+        self.popup_checkbox = tk.Checkbutton(
+            notifications_frame, 
+            text="Enable popup notifications", 
+            variable=self.notification_popup_enabled,
+            font=self.default_font
+        )
+        self.popup_checkbox.pack(side="left")
+
+        # File size filter
+        size_frame = tk.Frame(settings_frame)
+        size_frame.pack(fill="x", pady=2)
+        
+        tk.Label(size_frame, text="Minimum file size (MB):", font=self.default_font).pack(side="left", padx=(0, 5))
+        self.size_spinbox = tk.Spinbox(
+            size_frame,
+            from_=0.1,
+            to=1000.0,
+            increment=0.5,
+            textvariable=self.min_file_size,
+            width=8,
+            font=self.default_font
+        )
+        self.size_spinbox.pack(side="left")
 
         # Main content frame with padding
         main_content_frame = tk.Frame(self.master, padx=15, pady=10)
@@ -609,19 +667,51 @@ class DownloadNotifierApp:
         self.status_label.pack(padx=5, pady=(0, 10), fill="x", expand=True)
 
         # Download history/log
-        log_frame = tk.Frame(main_content_frame, bd=2, relief="sunken")
-        log_frame.pack(fill="both", expand=True)
+        log_frame = tk.LabelFrame(main_content_frame, text="Activity Log", font=self.default_font, bd=2, relief="groove")
+        log_frame.pack(fill="both", expand=True, pady=(0, 10))
 
-        self.log_text = tk.Text(log_frame, height=8, width=60, state="disabled", font=("Consolas", 9), wrap="word")
+        # Create frame for text widget and scrollbar
+        text_frame = tk.Frame(log_frame)
+        text_frame.pack(fill="both", expand=True, padx=5, pady=5)
+
+        self.log_text = tk.Text(text_frame, height=8, width=60, state="disabled", font=("Consolas", 9), wrap="word")
         self.log_text.pack(side="left", fill="both", expand=True)
         self.log_text.tag_config("download", foreground="blue")
         self.log_text.tag_config("error", foreground="red")
         self.log_text.tag_config("info", foreground="grey") # New tag for general info
 
         # Scrollbar for log text
-        scrollbar = tk.Scrollbar(log_frame, command=self.log_text.yview)
+        scrollbar = tk.Scrollbar(text_frame, command=self.log_text.yview)
         scrollbar.pack(side="right", fill="y")
         self.log_text.config(yscrollcommand=scrollbar.set)
+
+        # Log control frame
+        log_control_frame = tk.Frame(log_frame)
+        log_control_frame.pack(fill="x", padx=5, pady=(0, 5))
+        
+        self.clear_log_button = tk.Button(
+            log_control_frame,
+            text="Clear Log",
+            command=self._clear_log,
+            font=self.default_font,
+            relief="raised",
+            bd=2,
+            padx=10,
+            pady=2
+        )
+        self.clear_log_button.pack(side="left")
+        
+        self.save_log_button = tk.Button(
+            log_control_frame,
+            text="Save Log",
+            command=self._save_log,
+            font=self.default_font,
+            relief="raised",
+            bd=2,
+            padx=10,
+            pady=2
+        )
+        self.save_log_button.pack(side="left", padx=(5, 0))
 
         # Footer frame
         footer_frame = tk.Frame(self.master, padx=15, pady=5)
@@ -643,13 +733,16 @@ class DownloadNotifierApp:
 
         # List of widgets to apply theme to
         self.themable_widgets = [
-            self.master, header_frame, main_content_frame, path_frame, button_frame, log_frame, footer_frame,
+            self.master, header_frame, main_content_frame, path_frame, button_frame, 
+            log_frame, text_frame, log_control_frame, footer_frame, settings_frame,
+            notifications_frame, size_frame,
             self.app_title_label, self.status_label, self.log_text, self.path_entry,
             self.start_button, self.stop_button, self.browse_button,
-            self.stop_alarm_button, self.about_link_label
+            self.stop_alarm_button, self.about_link_label, self.sound_checkbox,
+            self.popup_checkbox, self.size_spinbox, self.clear_log_button, self.save_log_button
         ]
-        # Add labels in path_frame
-        for widget in path_frame.winfo_children():
+        # Add labels in path_frame and size_frame
+        for widget in path_frame.winfo_children() + size_frame.winfo_children():
             if isinstance(widget, tk.Label):
                 self.themable_widgets.append(widget)
 
@@ -681,6 +774,8 @@ class DownloadNotifierApp:
                     widget.config(bg=theme_colors["browse_button_bg"], fg=theme_colors["browse_button_fg"])
                 elif widget == self.stop_alarm_button:
                     widget.config(bg=theme_colors["stop_alarm_button_bg"], fg=theme_colors["stop_alarm_button_fg"])
+                elif widget in [self.clear_log_button, self.save_log_button]:
+                    widget.config(bg=theme_colors["browse_button_bg"], fg=theme_colors["browse_button_fg"])
             elif isinstance(widget, tk.Label):
                 # Apply foreground based on label type
                 if widget == self.about_link_label:
@@ -688,8 +783,10 @@ class DownloadNotifierApp:
                     widget.config(font=self.footer_font) # Reset font to default (not underlined)
                 else: # General labels (including app_title_label and path_frame labels)
                     widget.config(bg=theme_colors["bg"], fg=theme_colors["fg"])
-            elif isinstance(widget, tk.Frame):
+            elif isinstance(widget, (tk.Frame, tk.LabelFrame)):
                 widget.config(bg=theme_colors["bg"])
+            elif isinstance(widget, (tk.Checkbutton, tk.Spinbox)):
+                widget.config(bg=theme_colors["bg"], fg=theme_colors["fg"])
 
     def _browse_directory(self):
         """Opens a directory selection dialog."""
