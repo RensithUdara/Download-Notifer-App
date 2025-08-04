@@ -13,6 +13,9 @@ import re
 import sqlite3 # Added for potential Telegram DB access, though highly experimental
 import sys
 from pathlib import Path
+from datetime import datetime
+import webbrowser
+import hashlib
 
 # --- Configuration ---
 # Default download directory (can be changed by user)
@@ -25,6 +28,12 @@ ALARM_SOUND_FILE = "alarm.wav" # You can change this to "alarm.mp3" if you prefe
 # File size thresholds for notifications (in MB)
 MIN_FILE_SIZE_MB = 1  # Only notify for files larger than 1MB
 MAX_PROCESSING_TIME = 300  # Maximum time to wait for a file to complete (5 minutes)
+
+# UI Configuration
+APP_VERSION = "2.0.0"
+WINDOW_MIN_WIDTH = 800
+WINDOW_MIN_HEIGHT = 600
+SETTINGS_FILE = "settings.json"
 
 # --- Theme Configuration ---
 LIGHT_THEME = {
