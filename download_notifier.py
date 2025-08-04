@@ -276,6 +276,7 @@ class SizeAwareDownloadHandler(FileSystemEventHandler):
             ".idm", ".idm.tmp", ".idm.bak", ".dwnl", ".inprogress",
             ".downloading", ".temp", ".partial", ".resume",
             ".unconfirmed", ".opdownload", ".!ut", ".td", # .td for Telegram temp
+            ".crswap", ".swp", ".lock", ".~"
         )
         
         for ext in temp_extensions:
@@ -285,8 +286,17 @@ class SizeAwareDownloadHandler(FileSystemEventHandler):
         # Common temporary file patterns in filenames
         if (file_name_lower.startswith("downloading_") or 
             file_name_lower.startswith("temp_") or
+            file_name_lower.startswith("~") or
             "_downloading" in file_name_lower or
-            file_name.startswith(".")): # Hidden files often used as temp
+            file_name.startswith(".")):  # Hidden files often used as temp
+            return True
+            
+        # Check file size - very small files might be incomplete
+        try:
+            file_size = os.path.getsize(file_path)
+            if file_size < 1024:  # Less than 1KB, might be a stub
+                return True
+        except (OSError, FileNotFoundError):
             return True
             
         return False
