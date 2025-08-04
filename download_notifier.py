@@ -838,6 +838,10 @@ class DownloadNotifierApp:
             self.update_status("Already monitoring.")
             return
 
+        # Update global MIN_FILE_SIZE_MB from settings
+        global MIN_FILE_SIZE_MB
+        MIN_FILE_SIZE_MB = self.min_file_size.get()
+
         # Use the new size-aware handler
         self.event_handler = SizeAwareDownloadHandler(self)
         self.observers = [] # Reset list of observers
@@ -861,7 +865,7 @@ class DownloadNotifierApp:
             self.is_monitoring = True
             self.start_button.config(state="disabled")
             self.stop_button.config(state="normal")
-            self.update_status(f"Size-aware monitoring started for: {', '.join(monitoring_successful_paths)}")
+            self.update_status(f"Size-aware monitoring started for: {', '.join([os.path.basename(p) for p in monitoring_successful_paths])}")
             self._log_message(f"Size-aware monitoring started for: {', '.join(monitoring_successful_paths)}", "info")
         else:
             messagebox.showerror("Error", "No valid directories found to start monitoring.")
@@ -945,6 +949,9 @@ class DownloadNotifierApp:
 
     def _play_alarm_sound(self):
         """Plays the alarm sound using pygame.mixer.music."""
+        if not self.notification_sound_enabled.get():
+            return
+            
         try:
             if not pygame.mixer.get_init():
                 pygame.mixer.init() # Ensure mixer is initialized in this thread if it wasn't already
@@ -969,22 +976,31 @@ class DownloadNotifierApp:
         self.update_status(f"Download Complete: {download_name}!")
 
         # Start a new thread to play the alarm sound
-        sound_thread = threading.Thread(target=self._play_alarm_sound)
-        sound_thread.daemon = True # Allow thread to exit with main app
-        sound_thread.start()
+        if self.notification_sound_enabled.get():
+            sound_thread = threading.Thread(target=self._play_alarm_sound)
+            sound_thread.daemon = True # Allow thread to exit with main app
+            sound_thread.start()
 
         # Show the message box on the main thread (this will block until dismissed)
-        messagebox.showinfo("Download Complete", notification_msg)
+        if self.notification_popup_enabled.get():
+            messagebox.showinfo("Download Complete", notification_msg)
 
     def _show_about(self):
         """Displays an about message box."""
         messagebox.showinfo(
             "About Download Notifier",
-            "Version: 1.0.0 (Enhanced)\n"
-            "Created by: Sandaru Gunathilake\n\n"
+            "Version: 1.1.0 (Enhanced)\n"
+            "Created by: Sandaru Gunathilake\n"
+            "Enhanced by: AI Assistant\n\n"
             "This application monitors specified directories for completed downloads\n"
-            "and notifies you with an alarm and a pop-up. It now includes\n"
-            "more robust download completion detection based on file size."
+            "and notifies you with customizable alarms and pop-ups. Features include:\n\n"
+            "• Size-aware download detection\n"
+            "• Multiple directory monitoring\n"
+            "• Configurable file size filtering\n"
+            "• Activity logging with save/clear options\n"
+            "• Customizable notifications\n"
+            "• Enhanced temporary file detection\n"
+            "• Processing timeout protection"
         )
 
     def _on_about_link_enter(self, event):
