@@ -623,6 +623,9 @@ class DownloadNotifierApp:
         # Notifications history
         self.notifications_history = []
         
+        # Initialize status timer
+        self.status_timer = None
+        
         # Initialize Pygame mixer
         if not pygame.mixer.get_init():
             try:
@@ -1221,63 +1224,47 @@ class DownloadNotifierApp:
         # Use enhanced theme system
         self.apply_enhanced_theme()
         self.configure_styles()
+
+    def configure_styles(self):
+        """Configure ttk styles for current theme"""
+        if self.current_theme in CREATIVE_THEMES:
+            theme = CREATIVE_THEMES[self.current_theme]
+        elif self.current_theme == "dark":
+            theme = DARK_THEME
+        else:
+            theme = LIGHT_THEME
+            
+        style = ttk.Style()
+        style.theme_use('clam')
         
-        # Apply to all widgets recursively
-        self.apply_theme_to_widget(self.master, theme)
-    
-    def apply_theme_to_widget(self, widget, theme):
-        """Recursively apply theme to widget and its children"""
-        try:
-            widget_class = widget.winfo_class()
-            
-            if widget_class in ["Frame", "Toplevel"]:
-                widget.config(bg=theme["bg"])
-            elif widget_class == "Label":
-                widget.config(bg=theme["bg"], fg=theme["fg"])
-            elif widget_class == "Button":
-                self.style_button(widget, theme)
-            elif widget_class == "Entry":
-                widget.config(bg=theme["entry_bg"], fg=theme["entry_fg"],
-                             insertbackground=theme["fg"])
-            elif widget_class == "Text":
-                widget.config(bg=theme["text_bg"], fg=theme["text_fg"],
-                             insertbackground=theme["fg"])
-            elif widget_class == "Listbox":
-                widget.config(bg=theme["text_bg"], fg=theme["text_fg"])
-            elif widget_class == "LabelFrame":
-                widget.config(bg=theme["bg"], fg=theme["fg"])
-            elif widget_class == "Checkbutton":
-                widget.config(bg=theme["bg"], fg=theme["fg"],
-                             activebackground=theme["hover"])
-            elif widget_class == "Radiobutton":
-                widget.config(bg=theme["bg"], fg=theme["fg"],
-                             activebackground=theme["hover"])
-            elif widget_class == "Spinbox":
-                widget.config(bg=theme["entry_bg"], fg=theme["entry_fg"])
-            
-            # Apply to children
-            for child in widget.winfo_children():
-                self.apply_theme_to_widget(child, theme)
-                
-        except tk.TclError:
-            pass  # Some widgets don't support certain config options
+        # Configure notebook style
+        style.configure('Custom.TNotebook', 
+                       background=theme["bg"],
+                       tabmargins=[2, 5, 2, 0])
+        style.configure('Custom.TNotebook.Tab',
+                       background=theme["secondary_bg"],
+                       foreground=theme["fg"],
+                       padding=[12, 8])
+        style.map('Custom.TNotebook.Tab',
+                 background=[('selected', theme["accent"]),
+                           ('active', theme["hover"])])
     
     def style_button(self, button, theme):
         """Apply theme-specific styling to buttons"""
-        button_text = button.cget("text")
-        
-        if "Start" in button_text:
-            button.config(bg=theme["accent"], fg="white",
-                         activebackground=theme["accent_hover"])
-        elif "Stop" in button_text:
-            button.config(bg=theme["danger"], fg="white",
-                         activebackground=theme["danger_hover"])
-        elif button == self.theme_button:
-            button.config(bg=theme["secondary_bg"], fg=theme["fg"],
-                         activebackground=theme["hover"])
-        else:
-            button.config(bg=theme["secondary_bg"], fg=theme["fg"],
-                         activebackground=theme["hover"])
+        try:
+            button_text = button.cget("text")
+            
+            if "Start" in button_text or "▶️" in button_text:
+                button.config(bg=theme["accent"], fg="white",
+                             activebackground=theme["accent_hover"])
+            elif "Stop" in button_text or "⏹️" in button_text:
+                button.config(bg=theme["danger"], fg="white",
+                             activebackground=theme["danger_hover"])
+            else:
+                button.config(bg=theme["secondary_bg"], fg=theme["fg"],
+                             activebackground=theme["hover"])
+        except:
+            pass
     
     def show_status(self, message, level="info", duration=0):
         """Show status message with optional auto-clear"""
