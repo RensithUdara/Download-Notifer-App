@@ -35,24 +35,43 @@ WINDOW_MIN_WIDTH = 800
 WINDOW_MIN_HEIGHT = 600
 SETTINGS_FILE = "settings.json"
 
-# --- Theme Configuration ---
+# --- Enhanced Theme Configuration ---
+DARK_THEME = {
+    "bg": "#2b2b2b",
+    "fg": "#ffffff",
+    "secondary_bg": "#3c3c3c",
+    "accent": "#4CAF50",
+    "accent_hover": "#45a049",
+    "danger": "#f44336",
+    "danger_hover": "#da190b",
+    "warning": "#ff9800",
+    "info": "#2196F3",
+    "success": "#4CAF50",
+    "text_bg": "#404040",
+    "text_fg": "#ffffff",
+    "entry_bg": "#505050",
+    "entry_fg": "#ffffff",
+    "border": "#555555",
+    "hover": "#4a4a4a"
+}
+
 LIGHT_THEME = {
-    "bg": "#f0f0f0",  # Light grey background
-    "fg": "#333333",  # Dark grey foreground
-    "button_bg": "#4CAF50", # Green for start
-    "button_fg": "white",
-    "stop_button_bg": "#f44336", # Red for stop
-    "stop_button_fg": "white",
-    "text_bg": "white",
+    "bg": "#f5f5f5",
+    "fg": "#333333",
+    "secondary_bg": "#ffffff",
+    "accent": "#4CAF50",
+    "accent_hover": "#45a049",
+    "danger": "#f44336",
+    "danger_hover": "#da190b",
+    "warning": "#ff9800",
+    "info": "#2196F3",
+    "success": "#4CAF50",
+    "text_bg": "#ffffff",
     "text_fg": "#333333",
-    "entry_bg": "white",
+    "entry_bg": "#ffffff",
     "entry_fg": "#333333",
-    "browse_button_bg": "#2196F3", # Blue for browse
-    "browse_button_fg": "white",
-    "stop_alarm_button_bg": "#FFC107", # Amber for stop alarm
-    "stop_alarm_button_fg": "black",
-    "about_link_fg": "#0000EE", # Standard blue for links
-    "footer_fg": "#666666" # Darker grey for footer in light theme
+    "border": "#cccccc",
+    "hover": "#e0e0e0"
 }
 
 # --- Enhanced File System Event Handler with Size Checking ---
@@ -513,42 +532,127 @@ class SizeAwareDownloadHandler(FileSystemEventHandler):
 class DownloadNotifierApp:
     def __init__(self, master):
         self.master = master
-        master.title("Download Notifier - Enhanced v1.1")
-        master.geometry("700x500")
-        master.resizable(True, True)  # Make window resizable
-        master.minsize(600, 450)  # Set minimum size
+        master.title(f"Download Notifier Pro v{APP_VERSION}")
+        master.geometry("900x700")
+        master.resizable(True, True)
+        master.minsize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
 
+        # Application state
         self.monitor_path = tk.StringVar(value=DEFAULT_DOWNLOAD_DIR)
-        self.observers = [] # List to hold multiple Observer instances
+        self.observers = []
         self.event_handler = None
         self.is_monitoring = False
-        self.notification_sound_enabled = tk.BooleanVar(value=True)
-        self.notification_popup_enabled = tk.BooleanVar(value=True)
-        self.min_file_size = tk.DoubleVar(value=MIN_FILE_SIZE_MB)
+        self.download_history = []
+        self.statistics = {
+            "total_downloads": 0,
+            "total_size": 0,
+            "session_start": time.time()
+        }
         
-        # Initialize Pygame mixer here as well, in case it wasn't done in __main__
+        # Settings
+        self.current_theme = "light"
+        self.settings = self.load_settings()
+        self.notification_sound_enabled = tk.BooleanVar(value=self.settings.get("sound_enabled", True))
+        self.notification_popup_enabled = tk.BooleanVar(value=self.settings.get("popup_enabled", True))
+        self.min_file_size = tk.DoubleVar(value=self.settings.get("min_file_size", MIN_FILE_SIZE_MB))
+        self.auto_clear_log = tk.BooleanVar(value=self.settings.get("auto_clear_log", False))
+        self.show_file_details = tk.BooleanVar(value=self.settings.get("show_file_details", True))
+        
+        # Initialize Pygame mixer
         if not pygame.mixer.get_init():
             try:
                 pygame.mixer.init()
             except Exception as e:
                 print(f"Could not initialize Pygame mixer in app: {e}")
 
+        # Setup UI
+        self.setup_styles()
         self._create_widgets()
-        self._apply_theme(LIGHT_THEME) # Always apply light theme
-        self._center_window() # Center the window after widgets are created and theme applied
-
-        # --- MODIFICATION: CHANGE THE WINDOW CLOSE PROTOCOL ---
-        # Now, clicking 'X' will call on_closing, which stops monitoring and quits the app.
+        self.apply_theme()
+        self._center_window()
+        
+        # Bind events
         self.master.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.master.bind("<Control-s>", lambda e: self.save_settings())
+        self.master.bind("<F5>", lambda e: self.refresh_ui())
+        
+        # Status bar timer
+        self.status_timer = None
 
-    def _center_window(self):
-        """Centers the Tkinter window on the screen."""
-        self.master.update_idletasks() # Update window to get accurate dimensions
-        width = self.master.winfo_width()
-        height = self.master.winfo_height()
-        x = (self.master.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.master.winfo_screenheight() // 2) - (height // 2)
-        self.master.geometry(f'{width}x{height}+{x}+{y}')
+    def load_settings(self):
+        """Load settings from JSON file"""
+        try:
+            if os.path.exists(SETTINGS_FILE):
+                with open(SETTINGS_FILE, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"Error loading settings: {e}")
+        return {}
+    
+    def save_settings(self):
+        """Save current settings to JSON file"""
+        try:
+            settings = {
+                "sound_enabled": self.notification_sound_enabled.get(),
+                "popup_enabled": self.notification_popup_enabled.get(),
+                "min_file_size": self.min_file_size.get(),
+                "auto_clear_log": self.auto_clear_log.get(),
+                "show_file_details": self.show_file_details.get(),
+                "monitor_paths": self.monitor_path.get(),
+                "theme": self.current_theme,
+                "window_geometry": self.master.geometry()
+            }
+            with open(SETTINGS_FILE, 'w') as f:
+                json.dump(settings, f, indent=2)
+            self.show_status("Settings saved successfully", "success", 2000)
+        except Exception as e:
+            self.show_status(f"Error saving settings: {e}", "error", 3000)
+    
+    def setup_styles(self):
+        """Setup ttk styles"""
+        self.style = ttk.Style()
+        self.style.theme_use('clam')
+        
+        # Configure styles for different themes
+        self.configure_styles()
+    
+    def configure_styles(self):
+        """Configure ttk styles based on current theme"""
+        theme = DARK_THEME if self.current_theme == "dark" else LIGHT_THEME
+        
+        # Configure ttk styles
+        self.style.configure('Title.TLabel', 
+                           font=('Segoe UI', 16, 'bold'),
+                           background=theme["bg"],
+                           foreground=theme["fg"])
+        
+        self.style.configure('Heading.TLabel',
+                           font=('Segoe UI', 12, 'bold'),
+                           background=theme["bg"],
+                           foreground=theme["fg"])
+        
+        self.style.configure('Custom.TButton',
+                           font=('Segoe UI', 10),
+                           padding=(10, 5))
+        
+        self.style.configure('Accent.TButton',
+                           font=('Segoe UI', 11, 'bold'),
+                           padding=(15, 8))
+        
+        # Notebook styles
+        self.style.configure('Custom.TNotebook',
+                           background=theme["bg"],
+                           borderwidth=0)
+        
+        self.style.configure('Custom.TNotebook.Tab',
+                           padding=(20, 10),
+                           font=('Segoe UI', 10))
+
+    def refresh_ui(self):
+        """Refresh the UI components"""
+        self.apply_theme()
+        self.update_statistics_display()
+        self.show_status("UI refreshed", "info", 1500)
 
     def _create_widgets(self):
         """Initializes and places all GUI elements."""
