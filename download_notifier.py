@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
 import time
+import math
 import threading
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
