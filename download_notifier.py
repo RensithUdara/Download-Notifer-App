@@ -1477,7 +1477,355 @@ class DownloadNotifierApp:
             self.current_theme = "light"
             self.theme_var.set("light")
             self.apply_theme()
-            self.show_status("Settings reset to defaults", "success", 2000)
+    def start_monitoring(self):
+        """Enhanced monitoring with better UI feedback"""
+        paths_to_monitor_str = self.monitor_path.get()
+        paths = [p.strip() for p in paths_to_monitor_str.split(',') if p.strip()]
+
+        if not paths:
+            messagebox.showerror("Error", "No directories specified for monitoring.")
+            return
+
+        if self.is_monitoring:
+            self.show_status("Already monitoring", "warning", 2000)
+            return
+
+        # Update global MIN_FILE_SIZE_MB from settings
+        global MIN_FILE_SIZE_MB
+        MIN_FILE_SIZE_MB = self.min_file_size.get()
+
+        # Create enhanced handler
+        self.event_handler = SizeAwareDownloadHandler(self)
+        self.observers = []
+        monitoring_successful_paths = []
+
+        for path_to_monitor in paths:
+            if not os.path.isdir(path_to_monitor):
+                self.log_message(f"Invalid directory: {path_to_monitor}", "error")
+                continue
+                
+            try:
+                observer = Observer()
+                observer.schedule(self.event_handler, path_to_monitor, recursive=True)
+                observer.start()
+                self.observers.append(observer)
+                monitoring_successful_paths.append(path_to_monitor)
+                self.log_message(f"Started monitoring: {path_to_monitor}", "info")
+            except Exception as e:
+                self.log_message(f"Failed to monitor {path_to_monitor}: {e}", "error")
+
+        if monitoring_successful_paths:
+            self.is_monitoring = True
+            self.start_button.config(state="disabled")
+            self.stop_button.config(state="normal")
+            
+            # Update status indicator
+            self.status_indicator.config(text="● Running", fg="#4CAF50")
+            self.connection_label.config(fg="#4CAF50")
+            
+            paths_str = ", ".join([os.path.basename(p) for p in monitoring_successful_paths])
+            self.show_status(f"Monitoring {len(monitoring_successful_paths)} director{'y' if len(monitoring_successful_paths) == 1 else 'ies'}: {paths_str}", "success")
+            
+            self.log_message(f"Enhanced monitoring started for {len(monitoring_successful_paths)} directories", "info")
+        else:
+            messagebox.showerror("Error", "No valid directories found to start monitoring.")
+            self.show_status("Monitoring failed: No valid directories", "error", 3000)
+
+    def stop_monitoring(self):
+        """Enhanced stop monitoring with better feedback"""
+        if not self.is_monitoring:
+            self.show_status("Not currently monitoring", "warning", 2000)
+            return
+
+        self.show_status("Stopping monitoring...", "info")
+        
+        for observer in self.observers:
+            observer.stop()
+        for observer in self.observers:
+            observer.join()
+        self.observers = []
+
+        if self.event_handler:
+            self.event_handler.stop_processing()
+            self.event_handler = None
+
+        self.is_monitoring = False
+        self.start_button.config(state="normal")
+        self.stop_button.config(state="disabled")
+        
+        # Update status indicator
+        self.status_indicator.config(text="● Stopped", fg="#f44336")
+        self.connection_label.config(fg="#f44336")
+        
+        self.show_status("Monitoring stopped", "info", 2000)
+        self.log_message("Monitoring stopped by user", "info")
+
+    def update_status(self, message):
+        """Legacy compatibility method"""
+        self.show_status(message, "info")
+
+    def _log_message(self, message, tag=None):
+        """Legacy compatibility method"""
+        level_map = {"download": "download", "error": "error", "info": "info"}
+        self.log_message(message, level_map.get(tag, "info"))
+
+    def notify_download_complete(self, file_path):
+        """Enhanced download completion notification"""
+        download_name = os.path.basename(file_path)
+        
+        try:
+            file_size = os.path.getsize(file_path)
+            
+            # Format size
+            if file_size >= 1024**3:
+                size_str = f"{file_size / (1024**3):.2f} GB"
+            elif file_size >= 1024**2:
+                size_str = f"{file_size / (1024**2):.2f} MB"
+            elif file_size >= 1024:
+                size_str = f"{file_size / 1024:.2f} KB"
+            else:
+                size_str = f"{file_size:,} bytes"
+                
+            # Update statistics
+            self.statistics["total_downloads"] += 1
+            self.statistics["total_size"] += file_size
+            
+            # Add to download history
+            download_record = {
+                "timestamp": datetime.now().strftime("%H:%M:%S"),
+                "filename": download_name,
+                "size": file_size,
+                "size_formatted": size_str,
+                "path": file_path,
+                "directory": os.path.dirname(file_path),
+                "status": "completed"
+            }
+            self.download_history.append(download_record)
+            
+            # Create notification message
+            if self.show_file_details.get():
+                notification_msg = f"📥 Download Complete!\n\nFile: {download_name}\nSize: {size_str}\nLocation: {os.path.dirname(file_path)}"
+            else:
+                notification_msg = f"📥 Download Complete!\n\n{download_name}\nSize: {size_str}"
+            
+            # Log the completion
+            self.log_message(f"Download completed: {download_name} ({size_str})", "download")
+            
+            # Show notifications
+            self.master.after(0, lambda: self._show_notification_and_play_sound(download_name, notification_msg))
+            
+            # Update statistics display if on statistics tab
+            self.master.after(100, self.update_statistics_display)
+            
+        except Exception as e:
+            self.log_message(f"Error processing completed download {download_name}: {e}", "error")
+            # Fallback notification
+            self.master.after(0, lambda: self._show_notification_and_play_sound(download_name))
+
+    def _show_notification_and_play_sound(self, download_name, notification_msg=None):
+        """Enhanced notification display"""
+        if not notification_msg:
+            notification_msg = f"📥 File '{download_name}' has finished downloading!"
+            
+        self.show_status(f"✅ Download Complete: {download_name}", "success", 5000)
+
+        # Play sound if enabled
+        if self.notification_sound_enabled.get():
+            sound_thread = threading.Thread(target=self._play_alarm_sound, daemon=True)
+            sound_thread.start()
+
+        # Show popup if enabled
+        if self.notification_popup_enabled.get():
+            # Create custom notification dialog
+            self.show_custom_notification(download_name, notification_msg)
+
+    def show_custom_notification(self, title, message):
+        """Show a custom styled notification dialog"""
+        dialog = tk.Toplevel(self.master)
+        dialog.title("Download Complete")
+        dialog.geometry("400x200")
+        dialog.resizable(False, False)
+        dialog.transient(self.master)
+        dialog.grab_set()
+        
+        # Center the dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (400 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (200 // 2)
+        dialog.geometry(f"400x200+{x}+{y}")
+        
+        # Apply theme
+        theme = DARK_THEME if self.current_theme == "dark" else LIGHT_THEME
+        dialog.config(bg=theme["bg"])
+        
+        # Content frame
+        content = tk.Frame(dialog, bg=theme["bg"], padx=20, pady=20)
+        content.pack(fill="both", expand=True)
+        
+        # Icon and title
+        header = tk.Frame(content, bg=theme["bg"])
+        header.pack(fill="x", pady=(0, 15))
+        
+        icon_label = tk.Label(header, text="📥", font=("Segoe UI", 24), bg=theme["bg"], fg=theme["fg"])
+        icon_label.pack(side="left")
+        
+        title_label = tk.Label(header, text="Download Complete!", 
+                              font=("Segoe UI", 14, "bold"), bg=theme["bg"], fg=theme["accent"])
+        title_label.pack(side="left", padx=(10, 0))
+        
+        # Message
+        msg_label = tk.Label(content, text=message, font=("Segoe UI", 10), 
+                            bg=theme["bg"], fg=theme["fg"], justify="left", wraplength=350)
+        msg_label.pack(fill="x", pady=(0, 15))
+        
+        # Buttons
+        button_frame = tk.Frame(content, bg=theme["bg"])
+        button_frame.pack(fill="x")
+        
+        ok_button = tk.Button(button_frame, text="OK", command=dialog.destroy,
+                             font=("Segoe UI", 10, "bold"), bg=theme["accent"], fg="white",
+                             relief="flat", padx=20, pady=8)
+        ok_button.pack(side="right")
+        
+        # Auto-close after 10 seconds
+        dialog.after(10000, dialog.destroy)
+
+    def show_about(self):
+        """Enhanced about dialog"""
+        dialog = tk.Toplevel(self.master)
+        dialog.title("About Download Notifier Pro")
+        dialog.geometry("500x400")
+        dialog.resizable(False, False)
+        dialog.transient(self.master)
+        dialog.grab_set()
+        
+        # Center dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (500 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (400 // 2)
+        dialog.geometry(f"500x400+{x}+{y}")
+        
+        # Apply theme
+        theme = DARK_THEME if self.current_theme == "dark" else LIGHT_THEME
+        dialog.config(bg=theme["bg"])
+        
+        # Content
+        content = tk.Frame(dialog, bg=theme["bg"], padx=30, pady=30)
+        content.pack(fill="both", expand=True)
+        
+        # App icon and title
+        title_frame = tk.Frame(content, bg=theme["bg"])
+        title_frame.pack(fill="x", pady=(0, 20))
+        
+        icon = tk.Label(title_frame, text="📥", font=("Segoe UI", 32), bg=theme["bg"])
+        icon.pack()
+        
+        title = tk.Label(title_frame, text="Download Notifier Pro", 
+                        font=("Segoe UI", 18, "bold"), bg=theme["bg"], fg=theme["accent"])
+        title.pack()
+        
+        version = tk.Label(title_frame, text=f"Version {APP_VERSION}", 
+                          font=("Segoe UI", 12), bg=theme["bg"], fg=theme["fg"])
+        version.pack()
+        
+        # Description
+        desc_text = """
+An intelligent download monitoring application that watches specified 
+directories and notifies you when downloads are complete.
+
+Features:
+• Smart download detection with size-aware algorithms
+• Multiple directory monitoring with recursive support
+• Customizable notifications (sound + popup)
+• Real-time activity logging and statistics
+• Modern dark/light theme support
+• Export capabilities for logs and statistics
+• Enhanced temporary file filtering
+• Processing timeout protection
+
+Created by: Sandaru Gunathilake
+Enhanced by: AI Assistant
+
+This software is open source and free to use.
+        """
+        
+        desc = tk.Label(content, text=desc_text.strip(), font=("Segoe UI", 10),
+                       bg=theme["bg"], fg=theme["fg"], justify="left")
+        desc.pack(fill="x", pady=20)
+        
+        # Buttons
+        button_frame = tk.Frame(content, bg=theme["bg"])
+        button_frame.pack(fill="x", pady=(20, 0))
+        
+        github_button = tk.Button(button_frame, text="🌐 GitHub", 
+                                 command=lambda: webbrowser.open("https://github.com/RensithUdara/Download-Notifer-App"),
+                                 font=("Segoe UI", 10), bg=theme["info"], fg="white",
+                                 relief="flat", padx=15, pady=6)
+        github_button.pack(side="left")
+        
+        close_button = tk.Button(button_frame, text="Close", command=dialog.destroy,
+                                font=("Segoe UI", 10, "bold"), bg=theme["secondary_bg"], fg=theme["fg"],
+                                relief="flat", padx=20, pady=6)
+        close_button.pack(side="right")
+
+    def stop_alarm(self):
+        """Enhanced alarm stopping"""
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.stop()
+            self.stop_alarm_button.config(state="disabled")
+            self.show_status("Alarm stopped", "info", 2000)
+            self.log_message("Alarm manually stopped", "info")
+        else:
+            self.show_status("No alarm is currently playing", "warning", 2000)
+
+    def _play_alarm_sound(self):
+        """Enhanced alarm sound playback"""
+        if not self.notification_sound_enabled.get():
+            return
+            
+        try:
+            if not pygame.mixer.get_init():
+                pygame.mixer.init()
+
+            if os.path.exists(ALARM_SOUND_FILE):
+                pygame.mixer.music.load(ALARM_SOUND_FILE)
+                pygame.mixer.music.play()
+                
+                # Enable stop button
+                self.master.after(0, lambda: self.stop_alarm_button.config(state="normal"))
+                
+                # Wait for sound to finish
+                while pygame.mixer.music.get_busy():
+                    time.sleep(0.1)
+                    
+                # Disable stop button
+                self.master.after(0, lambda: self.stop_alarm_button.config(state="disabled"))
+            else:
+                self.log_message(f"Alarm sound file not found: {ALARM_SOUND_FILE}", "error")
+                
+        except pygame.error as e:
+            self.log_message(f"Audio playback error: {e}", "error")
+        except Exception as e:
+            self.log_message(f"Unexpected sound error: {e}", "error")
+
+    def on_closing(self):
+        """Enhanced graceful shutdown"""
+        if self.is_monitoring:
+            if messagebox.askyesno("Exit", "Monitoring is active. Stop monitoring and exit?"):
+                self.stop_monitoring()
+            else:
+                return
+        
+        # Save settings before closing
+        self.save_settings()
+        
+        # Stop any playing sounds
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.stop()
+        if pygame.mixer.get_init():
+            pygame.mixer.quit()
+            
+        self.master.destroy()
 
     def _apply_theme(self, theme_colors):
         """Applies the specified theme colors to the widgets."""
