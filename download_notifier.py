@@ -13,6 +13,9 @@ import re
 import sqlite3 # Added for potential Telegram DB access, though highly experimental
 import sys
 from pathlib import Path
+from datetime import datetime
+import webbrowser
+import hashlib
 
 # --- Configuration ---
 # Default download directory (can be changed by user)
@@ -25,6 +28,12 @@ ALARM_SOUND_FILE = "alarm.wav" # You can change this to "alarm.mp3" if you prefe
 # File size thresholds for notifications (in MB)
 MIN_FILE_SIZE_MB = 1  # Only notify for files larger than 1MB
 MAX_PROCESSING_TIME = 300  # Maximum time to wait for a file to complete (5 minutes)
+
+# UI Configuration
+APP_VERSION = "2.0.0"
+WINDOW_MIN_WIDTH = 800
+WINDOW_MIN_HEIGHT = 600
+SETTINGS_FILE = "settings.json"
 
 # --- Theme Configuration ---
 LIGHT_THEME = {
@@ -556,6 +565,10 @@ class DownloadNotifierApp:
         self.app_title_label = tk.Label(header_frame, text="Download Notifier - Enhanced", font=self.app_title_font)
         self.app_title_label.pack(side="left", expand=True, anchor="w") # Align left
 
+        # Main content frame with padding
+        main_content_frame = tk.Frame(self.master, padx=15, pady=10)
+        main_content_frame.pack(fill="both", expand=True)
+
         # Settings frame
         settings_frame = tk.LabelFrame(main_content_frame, text="Settings", font=self.default_font, padx=10, pady=5)
         settings_frame.pack(fill="x", pady=(0, 10))
@@ -595,10 +608,6 @@ class DownloadNotifierApp:
             font=self.default_font
         )
         self.size_spinbox.pack(side="left")
-
-        # Main content frame with padding
-        main_content_frame = tk.Frame(self.master, padx=15, pady=10)
-        main_content_frame.pack(fill="both", expand=True)
 
         # Path selection frame
         path_frame = tk.Frame(main_content_frame, pady=5)
@@ -838,6 +847,10 @@ class DownloadNotifierApp:
             self.update_status("Already monitoring.")
             return
 
+        # Update global MIN_FILE_SIZE_MB from settings
+        global MIN_FILE_SIZE_MB
+        MIN_FILE_SIZE_MB = self.min_file_size.get()
+
         # Use the new size-aware handler
         self.event_handler = SizeAwareDownloadHandler(self)
         self.observers = [] # Reset list of observers
@@ -861,7 +874,7 @@ class DownloadNotifierApp:
             self.is_monitoring = True
             self.start_button.config(state="disabled")
             self.stop_button.config(state="normal")
-            self.update_status(f"Size-aware monitoring started for: {', '.join(monitoring_successful_paths)}")
+            self.update_status(f"Size-aware monitoring started for: {', '.join([os.path.basename(p) for p in monitoring_successful_paths])}")
             self._log_message(f"Size-aware monitoring started for: {', '.join(monitoring_successful_paths)}", "info")
         else:
             messagebox.showerror("Error", "No valid directories found to start monitoring.")
@@ -945,6 +958,9 @@ class DownloadNotifierApp:
 
     def _play_alarm_sound(self):
         """Plays the alarm sound using pygame.mixer.music."""
+        if not self.notification_sound_enabled.get():
+            return
+            
         try:
             if not pygame.mixer.get_init():
                 pygame.mixer.init() # Ensure mixer is initialized in this thread if it wasn't already
@@ -969,22 +985,31 @@ class DownloadNotifierApp:
         self.update_status(f"Download Complete: {download_name}!")
 
         # Start a new thread to play the alarm sound
-        sound_thread = threading.Thread(target=self._play_alarm_sound)
-        sound_thread.daemon = True # Allow thread to exit with main app
-        sound_thread.start()
+        if self.notification_sound_enabled.get():
+            sound_thread = threading.Thread(target=self._play_alarm_sound)
+            sound_thread.daemon = True # Allow thread to exit with main app
+            sound_thread.start()
 
         # Show the message box on the main thread (this will block until dismissed)
-        messagebox.showinfo("Download Complete", notification_msg)
+        if self.notification_popup_enabled.get():
+            messagebox.showinfo("Download Complete", notification_msg)
 
     def _show_about(self):
         """Displays an about message box."""
         messagebox.showinfo(
             "About Download Notifier",
-            "Version: 1.0.0 (Enhanced)\n"
-            "Created by: Sandaru Gunathilake\n\n"
+            "Version: 1.1.0 (Enhanced)\n"
+            "Created by: Sandaru Gunathilake\n"
+            "Enhanced by: AI Assistant\n\n"
             "This application monitors specified directories for completed downloads\n"
-            "and notifies you with an alarm and a pop-up. It now includes\n"
-            "more robust download completion detection based on file size."
+            "and notifies you with customizable alarms and pop-ups. Features include:\n\n"
+            "• Size-aware download detection\n"
+            "• Multiple directory monitoring\n"
+            "• Configurable file size filtering\n"
+            "• Activity logging with save/clear options\n"
+            "• Customizable notifications\n"
+            "• Enhanced temporary file detection\n"
+            "• Processing timeout protection"
         )
 
     def _on_about_link_enter(self, event):
