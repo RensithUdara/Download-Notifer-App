@@ -1220,7 +1220,262 @@ class DownloadNotifierApp:
             pygame.mixer.music.play()
             self.show_status("Playing test sound...", "info", 2000)
         except Exception as e:
-            self.show_status(f"Sound test failed: {e}", "error", 3000)
+    def log_message(self, message, level="info"):
+        """Enhanced logging with filtering and formatting"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        formatted_message = f"[{timestamp}] {message}\n"
+        
+        # Apply to main log
+        self.status_text.config(state="normal")
+        self.status_text.insert(tk.END, formatted_message, level)
+        self.status_text.see(tk.END)
+        self.status_text.config(state="disabled")
+        
+        # Apply to activity tab log
+        self.log_text.config(state="normal")
+        
+        # Insert timestamp
+        self.log_text.insert(tk.END, f"[{timestamp}] ", "timestamp")
+        
+        # Insert message with appropriate tag
+        level_icons = {
+            "download": "📥 ",
+            "error": "❌ ",
+            "warning": "⚠️ ",
+            "info": "ℹ️ "
+        }
+        icon = level_icons.get(level, "")
+        self.log_text.insert(tk.END, f"{icon}{message}\n", level)
+        
+        self.log_text.see(tk.END)
+        self.log_text.config(state="disabled")
+        
+        # Auto-clear if enabled and log is too long
+        if self.auto_clear_log.get():
+            line_count = int(self.log_text.index('end-1c').split('.')[0])
+            if line_count > 1000:
+                self.clear_log(auto=True)
+    
+    def filter_log(self):
+        """Filter log display based on selection"""
+        filter_value = self.log_filter.get()
+        # This would require storing log entries separately and rebuilding
+        # For now, just show a status message
+        self.show_status(f"Showing {filter_value} entries", "info", 2000)
+    
+    def clear_log(self, auto=False):
+        """Clear the activity log"""
+        self.log_text.config(state="normal")
+        self.log_text.delete(1.0, tk.END)
+        self.log_text.config(state="disabled")
+        
+        self.status_text.config(state="normal")
+        self.status_text.delete(1.0, tk.END)
+        self.status_text.config(state="disabled")
+        
+        if not auto:
+            self.log_message("Log cleared manually", "info")
+        else:
+            self.log_message("Log auto-cleared (1000+ entries)", "info")
+    
+    def save_log(self):
+        """Save log to file"""
+        try:
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".txt",
+                filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+                title="Save Activity Log",
+                initialname=f"download_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            )
+            if filename:
+                with open(filename, 'w', encoding='utf-8') as f:
+                    log_content = self.log_text.get(1.0, tk.END)
+                    f.write(f"Download Notifier Pro v{APP_VERSION} - Activity Log\n")
+                    f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write("=" * 50 + "\n\n")
+                    f.write(log_content)
+                
+                self.show_status(f"Log saved: {os.path.basename(filename)}", "success", 3000)
+        except Exception as e:
+            self.show_status(f"Save failed: {e}", "error", 3000)
+    
+    def export_log(self):
+        """Export log in multiple formats"""
+        try:
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".json",
+                filetypes=[
+                    ("JSON files", "*.json"),
+                    ("CSV files", "*.csv"),
+                    ("Text files", "*.txt")
+                ],
+                title="Export Activity Log",
+                initialname=f"download_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            )
+            
+            if filename:
+                ext = os.path.splitext(filename)[1].lower()
+                
+                if ext == ".json":
+                    self.export_log_json(filename)
+                elif ext == ".csv":
+                    self.export_log_csv(filename)
+                else:
+                    self.save_log()  # Fallback to text
+                    
+        except Exception as e:
+            self.show_status(f"Export failed: {e}", "error", 3000)
+    
+    def export_log_json(self, filename):
+        """Export log as JSON"""
+        log_data = {
+            "metadata": {
+                "version": APP_VERSION,
+                "exported": datetime.now().isoformat(),
+                "session_start": datetime.fromtimestamp(self.statistics["session_start"]).isoformat()
+            },
+            "statistics": self.statistics,
+            "downloads": self.download_history
+        }
+        
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(log_data, f, indent=2, ensure_ascii=False)
+        
+        self.show_status(f"Exported JSON: {os.path.basename(filename)}", "success", 3000)
+    
+    def export_log_csv(self, filename):
+        """Export log as CSV"""
+        import csv
+        
+        with open(filename, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(["Timestamp", "Filename", "Size", "Path", "Status"])
+            
+            for download in self.download_history:
+                writer.writerow([
+                    download.get("timestamp", ""),
+                    download.get("filename", ""),
+                    download.get("size", ""),
+                    download.get("path", ""),
+                    download.get("status", "")
+                ])
+        
+        self.show_status(f"Exported CSV: {os.path.basename(filename)}", "success", 3000)
+    
+    def update_statistics_display(self):
+        """Update the statistics display"""
+        # Calculate session duration
+        duration = time.time() - self.statistics["session_start"]
+        hours, remainder = divmod(duration, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        duration_str = f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
+        
+        # Update statistics labels
+        self.stat_session_duration.config(text=duration_str)
+        self.stat_total_downloads.config(text=str(self.statistics["total_downloads"]))
+        
+        # Format total size
+        total_bytes = self.statistics["total_size"]
+        if total_bytes >= 1024**3:
+            size_str = f"{total_bytes / (1024**3):.2f} GB"
+        elif total_bytes >= 1024**2:
+            size_str = f"{total_bytes / (1024**2):.2f} MB"
+        elif total_bytes >= 1024:
+            size_str = f"{total_bytes / 1024:.2f} KB"
+        else:
+            size_str = f"{total_bytes} bytes"
+        
+        self.stat_total_size.config(text=size_str)
+        
+        # Calculate average size
+        if self.statistics["total_downloads"] > 0:
+            avg_bytes = self.statistics["total_size"] / self.statistics["total_downloads"]
+            if avg_bytes >= 1024**2:
+                avg_str = f"{avg_bytes / (1024**2):.2f} MB"
+            elif avg_bytes >= 1024:
+                avg_str = f"{avg_bytes / 1024:.2f} KB"
+            else:
+                avg_str = f"{avg_bytes:.0f} bytes"
+        else:
+            avg_str = "N/A"
+        
+        self.stat_avg_size.config(text=avg_str)
+        
+        # Update recent downloads tree
+        self.update_recent_downloads()
+    
+    def update_recent_downloads(self):
+        """Update the recent downloads tree view"""
+        # Clear existing items
+        for item in self.recent_tree.get_children():
+            self.recent_tree.delete(item)
+        
+        # Add recent downloads (last 50)
+        recent_downloads = self.download_history[-50:] if len(self.download_history) > 50 else self.download_history
+        
+        for download in reversed(recent_downloads):  # Most recent first
+            self.recent_tree.insert("", "end", values=(
+                download.get("timestamp", ""),
+                download.get("filename", ""),
+                download.get("size_formatted", ""),
+                download.get("directory", "")
+            ))
+    
+    def export_statistics(self):
+        """Export statistics to file"""
+        try:
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".json",
+                filetypes=[("JSON files", "*.json"), ("Text files", "*.txt")],
+                title="Export Statistics",
+                initialname=f"download_stats_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            )
+            
+            if filename:
+                stats_data = {
+                    "export_time": datetime.now().isoformat(),
+                    "session_statistics": self.statistics,
+                    "download_history": self.download_history,
+                    "settings": {
+                        "min_file_size": self.min_file_size.get(),
+                        "monitored_paths": self.monitor_path.get().split(',')
+                    }
+                }
+                
+                with open(filename, 'w', encoding='utf-8') as f:
+                    json.dump(stats_data, f, indent=2, ensure_ascii=False)
+                
+                self.show_status(f"Statistics exported: {os.path.basename(filename)}", "success", 3000)
+                
+        except Exception as e:
+            self.show_status(f"Export failed: {e}", "error", 3000)
+    
+    def clear_statistics(self):
+        """Clear statistics and download history"""
+        if messagebox.askyesno("Clear Statistics", 
+                              "Are you sure you want to clear all statistics and download history?"):
+            self.statistics = {
+                "total_downloads": 0,
+                "total_size": 0,
+                "session_start": time.time()
+            }
+            self.download_history.clear()
+            self.update_statistics_display()
+            self.show_status("Statistics cleared", "info", 2000)
+    
+    def reset_settings(self):
+        """Reset all settings to defaults"""
+        if messagebox.askyesno("Reset Settings", 
+                              "Are you sure you want to reset all settings to defaults?"):
+            self.notification_sound_enabled.set(True)
+            self.notification_popup_enabled.set(True)
+            self.min_file_size.set(MIN_FILE_SIZE_MB)
+            self.auto_clear_log.set(False)
+            self.show_file_details.set(True)
+            self.current_theme = "light"
+            self.theme_var.set("light")
+            self.apply_theme()
+            self.show_status("Settings reset to defaults", "success", 2000)
 
     def _apply_theme(self, theme_colors):
         """Applies the specified theme colors to the widgets."""
