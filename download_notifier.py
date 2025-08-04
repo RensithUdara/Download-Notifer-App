@@ -792,7 +792,37 @@ class DownloadNotifierApp:
         """Opens a directory selection dialog."""
         selected_dir = filedialog.askdirectory(initialdir=self.monitor_path.get())
         if selected_dir:
-            self.monitor_path.set(selected_dir)
+            # If there are already paths, add the new one with comma separation
+            current_paths = self.monitor_path.get()
+            if current_paths and current_paths.strip():
+                self.monitor_path.set(f"{current_paths}, {selected_dir}")
+            else:
+                self.monitor_path.set(selected_dir)
+
+    def _clear_log(self):
+        """Clears the activity log."""
+        self.log_text.config(state="normal")
+        self.log_text.delete(1.0, tk.END)
+        self.log_text.config(state="disabled")
+        self._log_message("Log cleared", "info")
+
+    def _save_log(self):
+        """Saves the activity log to a file."""
+        try:
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".txt",
+                filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+                title="Save Activity Log"
+            )
+            if filename:
+                with open(filename, 'w', encoding='utf-8') as f:
+                    log_content = self.log_text.get(1.0, tk.END)
+                    f.write(log_content)
+                self._log_message(f"Log saved to: {filename}", "info")
+                messagebox.showinfo("Success", f"Log saved successfully to:\n{filename}")
+        except Exception as e:
+            self._log_message(f"Error saving log: {e}", "error")
+            messagebox.showerror("Error", f"Failed to save log:\n{e}")
 
     def start_monitoring(self):
         """Starts monitoring the selected directory using SizeAwareDownloadHandler."""
