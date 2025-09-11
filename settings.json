@@ -1,0 +1,14 @@
+{
+  "sound_enabled": true,
+  "popup_enabled": true,
+  "min_file_size": 1.0,
+  "auto_clear_log": false,
+  "show_file_details": true,
+  "current_theme": "sunset",
+  "window_width": 900,
+  "window_height": 700,
+  "always_on_top": false,
+  "enable_gradient": true,
+  "animation_speed": "normal",
+  "enable_sound_effects": true
+}
