@@ -559,6 +559,40 @@ class SizeAwareDownloadHandler(FileSystemEventHandler):
         self.file_creation_times.clear()
         self.file_expected_sizes.clear()
 
+# --- Tooltip Class for Better UX ---
+class ToolTip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tooltip = None
+        self.widget.bind("<Enter>", self.show_tooltip)
+        self.widget.bind("<Leave>", self.hide_tooltip)
+    
+    def show_tooltip(self, event=None):
+        x, y, _, _ = self.widget.bbox("insert")
+        x += self.widget.winfo_rootx() + 25
+        y += self.widget.winfo_rooty() + 25
+        
+        # Create a toplevel window
+        self.tooltip = tk.Toplevel(self.widget)
+        self.tooltip.wm_overrideredirect(True)
+        self.tooltip.wm_geometry(f"+{x}+{y}")
+        
+        # Create the tooltip label
+        label = tk.Label(self.tooltip, text=self.text, 
+                        background="#ffffe0", relief="solid", borderwidth=1,
+                        font=("Segoe UI", 9), padx=5, pady=2)
+        label.pack()
+    
+    def hide_tooltip(self, event=None):
+        if self.tooltip:
+            self.tooltip.destroy()
+            self.tooltip = None
+
+def create_tooltip(widget, text):
+    """Create a tooltip for a given widget"""
+    return ToolTip(widget, text)
+
 # --- Main Application Class ---
 class DownloadNotifierApp:
     def __init__(self, master):
@@ -687,6 +721,8 @@ class DownloadNotifierApp:
     def configure_styles(self):
         """Configure ttk styles based on current theme"""
         theme = DARK_THEME if self.current_theme == "dark" else LIGHT_THEME
+        if self.current_theme in CREATIVE_THEMES:
+            theme = CREATIVE_THEMES[self.current_theme]
         
         # Configure ttk styles
         self.style.configure('Title.TLabel', 
@@ -699,6 +735,53 @@ class DownloadNotifierApp:
                            background=theme["bg"],
                            foreground=theme["fg"])
         
+        # Modern flat button design
+        self.style.configure('Flat.TButton',
+                           font=('Segoe UI', 10),
+                           background=theme["accent"],
+                           foreground='white',
+                           borderwidth=0,
+                           focusthickness=0,
+                           padding=(12, 8))
+        
+        # Button when hovered
+        self.style.map('Flat.TButton',
+                     background=[('active', theme["accent_hover"])],
+                     relief=[('pressed', 'flat'), ('!pressed', 'flat')])
+        
+        # Accent button style
+        self.style.configure('FlatAccent.TButton',
+                           font=('Segoe UI', 11, 'bold'),
+                           background=theme["accent"],
+                           foreground='white',
+                           borderwidth=0,
+                           focusthickness=0,
+                           padding=(15, 10))
+        
+        self.style.map('FlatAccent.TButton',
+                     background=[('active', theme["accent_hover"])],
+                     relief=[('pressed', 'flat'), ('!pressed', 'flat')])
+        
+        # Danger button style
+        self.style.configure('FlatDanger.TButton',
+                           font=('Segoe UI', 11, 'bold'),
+                           background=theme["danger"],
+                           foreground='white',
+                           borderwidth=0,
+                           focusthickness=0,
+                           padding=(15, 10))
+        
+        self.style.map('FlatDanger.TButton',
+                     background=[('active', theme["danger_hover"])],
+                     relief=[('pressed', 'flat'), ('!pressed', 'flat')])
+                     
+        # Card style for frames
+        self.style.configure('Card.TFrame',
+                           background=theme["secondary_bg"],
+                           relief='raised',
+                           borderwidth=0)
+                           
+        # Keeping legacy styles for backwards compatibility
         self.style.configure('Custom.TButton',
                            font=('Segoe UI', 10),
                            padding=(10, 5))
