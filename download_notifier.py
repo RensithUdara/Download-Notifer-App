@@ -2512,16 +2512,29 @@ This software is open source and free to use.
         try:
             widget_class = widget.winfo_class()
             
-            if widget_class in ['Frame', 'Toplevel']:
-                widget.configure(bg=theme["bg"])
+            if widget_class in ['Frame', 'Toplevel', 'TFrame']:
+                # For ttk frames, we need to check if it's a card frame
+                if widget_class == 'TFrame' and hasattr(widget, 'cget') and widget.cget('style') == 'Card.TFrame':
+                    # This is a card frame, handle it differently
+                    pass
+                else:
+                    widget.configure(bg=theme["bg"])
             elif widget_class == 'Label':
                 widget.configure(bg=theme["bg"], fg=theme["fg"])
             elif widget_class == 'Button':
-                widget.configure(bg=theme["accent"], fg=theme["bg"],
-                               activebackground=theme["accent_hover"])
+                # Apply modern flat design for buttons
+                settings = self.load_settings()
+                if settings.get("use_flat_design", True):
+                    widget.configure(bg=theme["accent"], fg="white",
+                                   activebackground=theme["accent_hover"],
+                                   relief="flat", bd=0, highlightthickness=0)
+                else:
+                    widget.configure(bg=theme["accent"], fg=theme["bg"],
+                                   activebackground=theme["accent_hover"])
             elif widget_class == 'Entry':
                 widget.configure(bg=theme["entry_bg"], fg=theme["entry_fg"],
-                               insertbackground=theme["fg"])
+                               insertbackground=theme["fg"],
+                               relief="flat", bd=1)
             elif widget_class == 'Text':
                 widget.configure(bg=theme["text_bg"], fg=theme["text_fg"],
                                insertbackground=theme["fg"])
@@ -2534,6 +2547,31 @@ This software is open source and free to use.
         # Apply to children
         for child in widget.winfo_children():
             self.apply_theme_to_widget(child, theme)
+            
+    def apply_card_shadows(self):
+        """Apply shadow effects to card frames for modern look"""
+        try:
+            # Find all card frames and apply shadow effects
+            for widget in self.master.winfo_children():
+                self._find_and_apply_card_shadows(widget)
+        except Exception as e:
+            # Silently handle exceptions
+            pass
+    
+    def _find_and_apply_card_shadows(self, widget):
+        """Recursively find Card.TFrame widgets and apply shadows"""
+        try:
+            if widget.winfo_class() == 'TFrame':
+                # Check if this is a card frame (using style attribute)
+                if hasattr(widget, 'cget') and widget.cget('style') == 'Card.TFrame':
+                    # Add subtle shadow effect with border radius
+                    widget.configure(relief='raised', borderwidth=1)
+            
+            # Process children
+            for child in widget.winfo_children():
+                self._find_and_apply_card_shadows(child)
+        except:
+            pass
 
     def apply_gradient_effects(self, theme):
         """Apply gradient background effects"""
