@@ -2474,7 +2474,7 @@ This software is open source and free to use.
         self.save_settings()
 
     def apply_enhanced_theme(self):
-        """Apply enhanced themes including creative ones"""
+        """Apply enhanced themes including creative ones with modern UI elements"""
         if self.current_theme in CREATIVE_THEMES:
             theme = CREATIVE_THEMES[self.current_theme]
         elif self.current_theme == "dark":
@@ -2484,6 +2484,9 @@ This software is open source and free to use.
         
         # Apply theme to main window
         self.master.configure(bg=theme["bg"])
+        
+        # Update ttk styles for flat design and card-based UI
+        self.configure_styles()
         
         # Apply to all frames and widgets recursively
         self.apply_theme_to_widget(self.master, theme)
@@ -2498,6 +2501,11 @@ This software is open source and free to use.
         # Apply gradient effects if enabled
         if self.enable_gradient.get() and "gradient_start" in theme:
             self.apply_gradient_effects(theme)
+            
+        # Apply shadow effects to card frames if using card design
+        settings = self.load_settings()
+        if settings.get("use_card_design", True):
+            self.apply_card_shadows()
 
     def apply_theme_to_widget(self, widget, theme):
         """Recursively apply theme to widget and children"""
