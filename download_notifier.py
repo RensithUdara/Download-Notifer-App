@@ -701,8 +701,18 @@ class DownloadNotifierApp:
                 "auto_clear_log": self.auto_clear_log.get(),
                 "show_file_details": self.show_file_details.get(),
                 "monitor_paths": self.monitor_path.get(),
-                "theme": self.current_theme,
-                "window_geometry": self.master.geometry()
+                "current_theme": self.current_theme,
+                "window_width": self.master.winfo_width(),
+                "window_height": self.master.winfo_height(),
+                "always_on_top": self.always_on_top.get(),
+                "enable_gradient": self.enable_gradient.get(),
+                "animation_speed": self.animation_speed.get(),
+                "enable_sound_effects": self.enable_sound_effects.get(),
+                "use_flat_design": True,  # Modern UI feature
+                "enable_tooltips": True,  # Modern UI feature
+                "use_card_design": True,  # Modern UI feature
+                "card_border_radius": 10, # Modern UI feature
+                "button_animation": True  # Modern UI feature
             }
             with open(SETTINGS_FILE, 'w') as f:
                 json.dump(settings, f, indent=2)
