@@ -10,5 +10,10 @@
   "always_on_top": false,
   "enable_gradient": true,
   "animation_speed": "normal",
-  "enable_sound_effects": true
+  "enable_sound_effects": true,
+  "use_flat_design": true,
+  "enable_tooltips": true,
+  "use_card_design": true,
+  "card_border_radius": 10,
+  "button_animation": true
 }
