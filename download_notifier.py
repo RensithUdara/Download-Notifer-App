@@ -906,124 +906,188 @@ class DownloadNotifierApp:
         self.create_notifications_tab()
     
     def create_monitor_tab(self):
-        """Create the main monitoring tab"""
+        """Create the main monitoring tab with modern UI elements"""
         monitor_frame = tk.Frame(self.notebook)
         self.notebook.add(monitor_frame, text="📁 Monitor")
         
-        # Directory selection section
-        dir_section = tk.LabelFrame(monitor_frame, text="📂 Directories to Monitor",
-                                   font=("Segoe UI", 11, "bold"), padx=15, pady=10)
+        # Directory selection section - Card-based design
+        dir_section = ttk.Frame(monitor_frame, style='Card.TFrame')
         dir_section.pack(fill="x", padx=10, pady=10)
         
+        # Header for card
+        header_frame = tk.Frame(dir_section, bg=self._get_theme_color("secondary_bg"))
+        header_frame.pack(fill="x", padx=0, pady=0)
+        
+        header_label = tk.Label(header_frame, text="📂 Directories to Monitor",
+                               font=("Segoe UI", 12, "bold"), 
+                               bg=self._get_theme_color("secondary_bg"),
+                               fg=self._get_theme_color("fg"))
+        header_label.pack(anchor="w", padx=15, pady=(10, 5))
+        
+        # Divider line
+        divider = tk.Frame(dir_section, height=1, bg=self._get_theme_color("border"))
+        divider.pack(fill="x", padx=0, pady=(0, 10))
+        
         # Path entry with modern styling
-        path_frame = tk.Frame(dir_section)
-        path_frame.pack(fill="x", pady=5)
+        path_frame = tk.Frame(dir_section, bg=self._get_theme_color("secondary_bg"))
+        path_frame.pack(fill="x", pady=5, padx=15)
         
         tk.Label(path_frame, text="Paths (comma-separated):",
-                font=("Segoe UI", 10)).pack(anchor="w", pady=(0, 5))
+                font=("Segoe UI", 10),
+                bg=self._get_theme_color("secondary_bg"),
+                fg=self._get_theme_color("fg")).pack(anchor="w", pady=(0, 5))
         
-        entry_frame = tk.Frame(path_frame)
+        entry_frame = tk.Frame(path_frame, bg=self._get_theme_color("secondary_bg"))
         entry_frame.pack(fill="x")
         
         self.path_entry = tk.Entry(entry_frame, textvariable=self.monitor_path,
-                                  font=("Segoe UI", 10), relief="solid", bd=1)
+                                  font=("Segoe UI", 10), 
+                                  relief="flat", bd=0,
+                                  bg=self._get_theme_color("entry_bg"),
+                                  fg=self._get_theme_color("entry_fg"),
+                                  insertbackground=self._get_theme_color("fg"))
         self.path_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        create_tooltip(self.path_entry, "Enter one or more directory paths to monitor, separated by commas")
         
-        self.browse_button = tk.Button(entry_frame, text="📁 Browse",
+        # Modern flat Browse button
+        self.browse_button = ttk.Button(entry_frame, text="📁 Browse",
                                       command=self.browse_directory,
-                                      font=("Segoe UI", 10), relief="raised", bd=1,
-                                      padx=15, pady=8)
+                                      style="Flat.TButton")
         self.browse_button.pack(side="right")
+        create_tooltip(self.browse_button, "Select a directory to monitor")
         
         # Enhanced Quick path buttons with more creative options
-        quick_paths_frame = tk.Frame(dir_section)
-        quick_paths_frame.pack(fill="x", pady=(10, 0))
+        quick_paths_frame = tk.Frame(dir_section, bg=self._get_theme_color("secondary_bg"))
+        quick_paths_frame.pack(fill="x", pady=(10, 15), padx=15)
         
         tk.Label(quick_paths_frame, text="✨ Quick Paths:",
-                font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 5))
+                font=("Segoe UI", 10, "bold"),
+                bg=self._get_theme_color("secondary_bg"),
+                fg=self._get_theme_color("fg")).pack(anchor="w", pady=(0, 5))
         
-        # First row of buttons
-        row1_frame = tk.Frame(quick_paths_frame)
+        # First row of buttons - flat modern style
+        row1_frame = tk.Frame(quick_paths_frame, bg=self._get_theme_color("secondary_bg"))
         row1_frame.pack(fill="x", pady=2)
         
         quick_paths_row1 = [
-            ("📥 Downloads", os.path.join(os.path.expanduser("~"), "Downloads")),
-            ("🖥️ Desktop", os.path.join(os.path.expanduser("~"), "Desktop")),
-            ("📄 Documents", os.path.join(os.path.expanduser("~"), "Documents"))
+            ("📥 Downloads", os.path.join(os.path.expanduser("~"), "Downloads"), "Monitor your Downloads folder"),
+            ("🖥️ Desktop", os.path.join(os.path.expanduser("~"), "Desktop"), "Monitor your Desktop folder"),
+            ("📄 Documents", os.path.join(os.path.expanduser("~"), "Documents"), "Monitor your Documents folder")
         ]
         
-        for name, path in quick_paths_row1:
-            btn = tk.Button(row1_frame, text=name,
+        for name, path, tooltip in quick_paths_row1:
+            btn = ttk.Button(row1_frame, text=name,
                            command=lambda p=path: self.add_quick_path(p),
-                           font=("Segoe UI", 9), relief="raised", bd=2,
-                           padx=12, pady=4)
+                           style="Flat.TButton")
             btn.pack(side="left", padx=3, expand=True, fill="x")
+            create_tooltip(btn, tooltip)
         
-        # Second row of buttons  
-        row2_frame = tk.Frame(quick_paths_frame)
+        # Second row of buttons - flat modern style
+        row2_frame = tk.Frame(quick_paths_frame, bg=self._get_theme_color("secondary_bg"))
         row2_frame.pack(fill="x", pady=2)
         
         quick_paths_row2 = [
-            ("🎵 Music", os.path.join(os.path.expanduser("~"), "Music")),
-            ("🎬 Videos", os.path.join(os.path.expanduser("~"), "Videos")),
-            ("🖼️ Pictures", os.path.join(os.path.expanduser("~"), "Pictures"))
+            ("🎵 Music", os.path.join(os.path.expanduser("~"), "Music"), "Monitor your Music folder"),
+            ("🎬 Videos", os.path.join(os.path.expanduser("~"), "Videos"), "Monitor your Videos folder"),
+            ("🖼️ Pictures", os.path.join(os.path.expanduser("~"), "Pictures"), "Monitor your Pictures folder")
         ]
         
-        for name, path in quick_paths_row2:
-            btn = tk.Button(row2_frame, text=name,
+        for name, path, tooltip in quick_paths_row2:
+            btn = ttk.Button(row2_frame, text=name,
                            command=lambda p=path: self.add_quick_path(p),
-                           font=("Segoe UI", 9), relief="raised", bd=2,
-                           padx=12, pady=4)
+                           style="Flat.TButton")
             btn.pack(side="left", padx=3, expand=True, fill="x")
+            create_tooltip(btn, tooltip)
         
-        # Control buttons section
-        control_section = tk.LabelFrame(monitor_frame, text="🎮 Control Panel",
-                                       font=("Segoe UI", 11, "bold"), padx=15, pady=10)
+        # Control buttons section - Card-based design
+        control_section = ttk.Frame(monitor_frame, style='Card.TFrame')
         control_section.pack(fill="x", padx=10, pady=10)
         
-        buttons_frame = tk.Frame(control_section)
-        buttons_frame.pack(fill="x", pady=10)
+        # Header for control card
+        control_header = tk.Frame(control_section, bg=self._get_theme_color("secondary_bg"))
+        control_header.pack(fill="x", padx=0, pady=0)
         
-        # Start/Stop buttons with modern styling
-        self.start_button = tk.Button(buttons_frame, text="▶️ Start Monitoring",
+        control_label = tk.Label(control_header, text="🎮 Control Panel",
+                                font=("Segoe UI", 12, "bold"), 
+                                bg=self._get_theme_color("secondary_bg"),
+                                fg=self._get_theme_color("fg"))
+        control_label.pack(anchor="w", padx=15, pady=(10, 5))
+        
+        # Divider line
+        control_divider = tk.Frame(control_section, height=1, bg=self._get_theme_color("border"))
+        control_divider.pack(fill="x", padx=0, pady=(0, 10))
+        
+        buttons_frame = tk.Frame(control_section, bg=self._get_theme_color("secondary_bg"))
+        buttons_frame.pack(fill="x", pady=10, padx=15)
+        
+        # Start/Stop buttons with flat design
+        self.start_button = ttk.Button(buttons_frame, text="▶️ Start Monitoring",
                                      command=self.start_monitoring,
-                                     font=("Segoe UI", 12, "bold"),
-                                     relief="raised", bd=2, padx=20, pady=12)
+                                     style="FlatAccent.TButton")
         self.start_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
+        create_tooltip(self.start_button, "Begin monitoring the selected directories")
         
-        self.stop_button = tk.Button(buttons_frame, text="⏹️ Stop Monitoring",
+        self.stop_button = ttk.Button(buttons_frame, text="⏹️ Stop Monitoring",
                                     command=self.stop_monitoring,
-                                    font=("Segoe UI", 12, "bold"),
-                                    relief="raised", bd=2, padx=20, pady=12,
+                                    style="FlatDanger.TButton",
                                     state="disabled")
         self.stop_button.pack(side="left", expand=True, fill="x", padx=(5, 0))
+        create_tooltip(self.stop_button, "Stop monitoring the selected directories")
         
-        # Additional controls
-        extra_controls = tk.Frame(control_section)
-        extra_controls.pack(fill="x", pady=(10, 0))
+        # Additional controls - flat design
+        extra_controls = tk.Frame(control_section, bg=self._get_theme_color("secondary_bg"))
+        extra_controls.pack(fill="x", pady=(10, 15), padx=15)
         
-        self.stop_alarm_button = tk.Button(extra_controls, text="🔇 Stop Alarm",
+        self.stop_alarm_button = ttk.Button(extra_controls, text="🔇 Stop Alarm",
                                           command=self.stop_alarm,
-                                          font=("Segoe UI", 10),
-                                          relief="raised", bd=1, padx=15, pady=6,
+                                          style="FlatDanger.TButton",
                                           state="disabled")
         self.stop_alarm_button.pack(side="left", padx=(0, 10))
+        create_tooltip(self.stop_alarm_button, "Stop the currently playing alarm sound")
         
-        self.test_sound_button = tk.Button(extra_controls, text="🔊 Test Sound",
+        self.test_sound_button = ttk.Button(extra_controls, text="🔊 Test Sound",
                                           command=self.test_alarm_sound,
-                                          font=("Segoe UI", 10),
-                                          relief="raised", bd=1, padx=15, pady=6)
+                                          style="Flat.TButton")
         self.test_sound_button.pack(side="left", padx=(0, 10))
+        create_tooltip(self.test_sound_button, "Play the alarm sound to test your volume settings")
         
-        # Status display
-        status_section = tk.LabelFrame(monitor_frame, text="📊 Current Status",
-                                      font=("Segoe UI", 11, "bold"), padx=15, pady=10)
+        # Status display - Card-based design
+        status_section = ttk.Frame(monitor_frame, style='Card.TFrame')
         status_section.pack(fill="both", expand=True, padx=10, pady=10)
         
+        # Header for status card
+        status_header = tk.Frame(status_section, bg=self._get_theme_color("secondary_bg"))
+        status_header.pack(fill="x", padx=0, pady=0)
+        
+        status_label = tk.Label(status_header, text="📊 Current Status",
+                               font=("Segoe UI", 12, "bold"), 
+                               bg=self._get_theme_color("secondary_bg"),
+                               fg=self._get_theme_color("fg"))
+        status_label.pack(anchor="w", padx=15, pady=(10, 5))
+        
+        # Divider line
+        status_divider = tk.Frame(status_section, height=1, bg=self._get_theme_color("border"))
+        status_divider.pack(fill="x", padx=0, pady=(0, 10))
+        
         self.status_text = tk.Text(status_section, height=6, wrap="word",
-                                  font=("Consolas", 9), relief="solid", bd=1,
+                                  font=("Consolas", 9), 
+                                  relief="flat", bd=0,
+                                  bg=self._get_theme_color("text_bg"),
+                                  fg=self._get_theme_color("text_fg"),
+                                  insertbackground=self._get_theme_color("text_fg"),
                                   state="disabled")
-        self.status_text.pack(fill="both", expand=True, pady=5)
+        self.status_text.pack(fill="both", expand=True, pady=5, padx=15)
+    
+    def _get_theme_color(self, color_key):
+        """Helper method to get theme colors"""
+        if self.current_theme == "dark":
+            return DARK_THEME.get(color_key, "#333333")
+        elif self.current_theme == "light":
+            return LIGHT_THEME.get(color_key, "#f5f5f5")
+        elif self.current_theme in CREATIVE_THEMES:
+            return CREATIVE_THEMES[self.current_theme].get(color_key, "#333333")
+        else:
+            return DARK_THEME.get(color_key, "#333333")
         
     def create_activity_tab(self):
         """Create the activity log tab"""
